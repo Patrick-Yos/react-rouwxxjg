@@ -348,83 +348,97 @@ const ArcadeOverlay = ({ onClose }) => {
   );
 };
 //--Dice COMPONENT---
-// --- NEW COMPONENT: FANTASTIC DICE ROLLER (D&D BEYOND STYLE) ---
+// --- NEW COMPONENT: DICE ROLLER (Script Injection Method) ---
 const DiceRoller = ({ onClose }) => {
-  const [diceBox, setDiceBox] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [pool, setPool] = useState([]); // Array of strings like ['d20', 'd6']
+  const [pool, setPool] = useState([]); 
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState(null);
   const [total, setTotal] = useState(0);
   const containerId = 'dice-box-container';
+  const boxRef = useRef(null); // Keep track of the instance
 
-  // Load the library from CDN on mount
+  // Load the library via Script Tag Injection
   useEffect(() => {
-    let boxInstance = null;
+    // Check if we already loaded it globally
+    if (window.DiceBox) {
+      initDiceBox();
+      return;
+    }
 
-    const loadDiceBox = async () => {
-      try {
-        // Dynamically import the ES module from unpkg
-        const DiceBox = (await import('https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/dice-box.es.min.js')).default;
-        
-        // Initialize the Dice Box
-        boxInstance = new DiceBox("#" + containerId, {
-          assetPath: "https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/assets/", // Assets from CDN
-          theme: "default", // You can change this to 'diceOfRolling', 'gemstone', etc.
-          themeColor: "#06b6d4", // Cyan color to match your theme
-          offscreen: true,
-          scale: 6, // Make them nice and big
-          gravity: 3,
-          mass: 5,
-          friction: 0.8
-        });
+    // 1. Create a script tag to load the module and assign it to window
+    const script = document.createElement('script');
+    script.type = 'module';
+    // We create a small inline module that imports the library and attaches it to the window
+    script.innerHTML = `
+      import DiceBox from 'https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/dice-box.es.min.js';
+      window.DiceBox = DiceBox;
+      // Dispatch event to let React know it's ready
+      window.dispatchEvent(new Event('dicebox-ready'));
+    `;
+    document.body.appendChild(script);
 
-        await boxInstance.init();
-        setDiceBox(boxInstance);
-        setIsLoaded(true);
+    // 2. Listen for the ready event
+    const handleReady = () => initDiceBox();
+    window.addEventListener('dicebox-ready', handleReady);
 
-        // Listen for results
-        boxInstance.onRollComplete = (rollResults) => {
-          // Calculate total
-          let sum = 0;
-          const resArray = [];
-          
-          rollResults.forEach(r => {
-             sum += r.value;
-             resArray.push({ type: r.type, value: r.value });
-          });
-
-          setResults(resArray);
-          setTotal(sum);
-          
-          // Auto vanish after 5 seconds
-          setTimeout(() => {
-            boxInstance.clear();
-            setResults(null);
-            setTotal(0);
-            setRolling(false);
-            // Optional: onClose(); // Uncomment if you want the whole widget to close
-          }, 5000);
-        };
-
-      } catch (error) {
-        console.error("Failed to load DiceBox:", error);
-      }
-    };
-
-    loadDiceBox();
-
-    // Cleanup
     return () => {
-      // DiceBox doesn't have a clean destroy method in this version, 
-      // but we clear the container refs
+      window.removeEventListener('dicebox-ready', handleReady);
+      // Clean up script tag if needed, though keeping it is usually fine
     };
   }, []);
+
+  const initDiceBox = async () => {
+    if (boxRef.current) return; // Already initialized
+
+    try {
+      // 3. Initialize the box from the global window object
+      const Box = new window.DiceBox("#" + containerId, {
+        assetPath: "https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/assets/",
+        theme: "default", // Themes: 'default', 'diceOfRolling', 'gemstone', 'rock', 'rust', 'smooth'
+        themeColor: "#06b6d4", // Cyan
+        offscreen: true,
+        scale: 6,
+        gravity: 3,
+        mass: 5,
+        friction: 0.8
+      });
+
+      await Box.init();
+      boxRef.current = Box;
+      setIsLoaded(true);
+
+      // Event Listener for Results
+      Box.onRollComplete = (rollResults) => {
+        let sum = 0;
+        const resArray = [];
+        
+        // The library returns an array of objects
+        rollResults.forEach(r => {
+           sum += r.value;
+           resArray.push({ type: r.type, value: r.value });
+        });
+
+        setResults(resArray);
+        setTotal(sum);
+        
+        // Auto vanish
+        setTimeout(() => {
+          if (boxRef.current) boxRef.current.clear();
+          setResults(null);
+          setTotal(0);
+          setRolling(false);
+        }, 8000); // 8 Seconds to view results
+      };
+
+    } catch (error) {
+      console.error("DiceBox Init Error:", error);
+    }
+  };
 
   const addToPool = (type) => {
     if (rolling) return;
     setPool([...pool, type]);
-    // Optional: play a click sound here
   };
 
   const clearPool = () => {
@@ -433,27 +447,20 @@ const DiceRoller = ({ onClose }) => {
   };
 
   const rollDice = async () => {
-    if (!diceBox || pool.length === 0 || rolling) return;
+    if (!boxRef.current || pool.length === 0 || rolling) return;
     
     setRolling(true);
     setResults(null);
     setTotal(0);
 
-    // Convert pool array ['d20', 'd6', 'd20'] to notation "2d20+1d6" or array of objects
-    // The library accepts an array of strings like ["2d20", "1d6"] 
-    // OR just a list of dice types to roll individually. 
-    
-    // Simple approach: map our pool directly.
-    // However, d1000 isn't standard. We will simulate d1000 by rolling a d10 and d100? 
-    // Or just 3d10. Let's use 3d10 for d1000 as it's the physical standard.
-    
+    // Handle d1000 (Simulate with 3 d10s) and others
     const rollPayload = pool.map(die => {
-        if (die === 'd1000') return '3d10'; // Simulate 1000 with 3 d10s
+        if (die === 'd1000') return '3d10'; 
         return '1' + die;
     });
 
     try {
-        await diceBox.roll(rollPayload);
+        await boxRef.current.roll(rollPayload);
     } catch (e) {
         console.error("Roll failed", e);
         setRolling(false);
@@ -461,37 +468,37 @@ const DiceRoller = ({ onClose }) => {
   };
 
   const diceOptions = [
-    { type: 'd4', label: 'D4', icon: 'pyramid' },
-    { type: 'd6', label: 'D6', icon: 'box' },
-    { type: 'd8', label: 'D8', icon: 'diamond' },
-    { type: 'd10', label: 'D10', icon: 'kite' },
-    { type: 'd12', label: 'D12', icon: 'dodeca' },
-    { type: 'd20', label: 'D20', icon: 'hex' },
-    { type: 'd100', label: 'D100', icon: 'circle' },
-    { type: 'd1000', label: 'D1K', icon: 'star' }, // Will roll 3d10
+    { type: 'd4', label: 'D4' },
+    { type: 'd6', label: 'D6' },
+    { type: 'd8', label: 'D8' },
+    { type: 'd10', label: 'D10' },
+    { type: 'd12', label: 'D12' },
+    { type: 'd20', label: 'D20' },
+    { type: 'd100', label: 'D100' },
+    { type: 'd1000', label: 'D1K' }, 
   ];
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center pointer-events-none">
         
-        {/* BACKGROUND CLICK CAPTURE (To Close) */}
+        {/* CLICK TO CLOSE (Background) */}
         <div className="absolute inset-0 z-0 pointer-events-auto" onClick={(e) => {
             if (e.target === e.currentTarget && !rolling) onClose();
         }}></div>
 
-        {/* 3D CANVAS CONTAINER (Full Screen) */}
+        {/* 3D RENDER LAYER */}
         <div 
             id={containerId} 
             className="absolute inset-0 z-10 pointer-events-none"
             style={{ width: '100%', height: '100%' }}
         />
 
-        {/* CONTROLS WIDGET */}
+        {/* UI CONTROLS LAYER */}
         <div className="relative z-20 mb-8 pointer-events-auto flex flex-col items-center gap-4 animate-in slide-in-from-bottom-10 duration-500">
             
             {/* RESULTS DISPLAY */}
             {results && (
-                <div className="bg-black/80 backdrop-blur-xl border-2 border-cyan-500 p-6 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.6)] flex flex-col items-center gap-2 min-w-[300px]">
+                <div className="bg-black/80 backdrop-blur-xl border-2 border-cyan-500 p-6 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.6)] flex flex-col items-center gap-2 min-w-[300px] animate-in zoom-in duration-300">
                     <h3 className="text-cyan-400 font-bold tracking-widest text-sm">TOTAL RESULT</h3>
                     <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300 drop-shadow-sm">
                         {total}
@@ -499,17 +506,17 @@ const DiceRoller = ({ onClose }) => {
                     <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
                         {results.map((r, i) => (
                             <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm text-cyan-200 font-mono">
-                                {r.type}: {r.value}
+                                {r.type.replace('d10', '') === '' && pool.includes('d1000') ? '?' : r.type}: {r.value}
                             </span>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* SELECTION BAR */}
+            {/* SELECTION WIDGET */}
             <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-4 max-w-3xl mx-4">
                 
-                {/* Header & Close */}
+                {/* Header */}
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                     <div className="flex items-center gap-2">
                          <Dices className="text-cyan-400 w-5 h-5" />
@@ -518,7 +525,7 @@ const DiceRoller = ({ onClose }) => {
                     <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle /></button>
                 </div>
 
-                {/* Dice Buttons */}
+                {/* Dice Grid */}
                 <div className="flex flex-wrap justify-center gap-3">
                     {diceOptions.map((opt) => (
                         <button
@@ -528,10 +535,8 @@ const DiceRoller = ({ onClose }) => {
                             className="group relative w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-900/50 transition-all active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center gap-1"
                         >
                             <span className="text-xs font-bold text-cyan-100">{opt.label}</span>
-                            {/* Simple icon representation */}
                             <div className={`w-2 h-2 rounded-full ${pool.filter(p => p === opt.type).length > 0 ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-gray-600'}`}></div>
                             
-                            {/* Badge count */}
                             {pool.filter(p => p === opt.type).length > 0 && (
                                 <div className="absolute -top-2 -right-2 w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/20">
                                     {pool.filter(p => p === opt.type).length}
