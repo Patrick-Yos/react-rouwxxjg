@@ -348,7 +348,7 @@ const ArcadeOverlay = ({ onClose }) => {
   );
 };
 //--Dice COMPONENT---
-// --- NEW COMPONENT: 3D DICE ROLLER (UPDATED) ---
+// --- NEW COMPONENT: 3D DICE ROLLER (ADVANCED) ---
 const DiceRoller = ({ onClose }) => {
   const [mode, setMode] = useState('menu'); // menu, rolling, result, vanishing
   const [selection, setSelection] = useState([]); 
@@ -356,17 +356,18 @@ const DiceRoller = ({ onClose }) => {
   const [total, setTotal] = useState(0);
   const mountRef = useRef(null);
   const diceRefs = useRef([]); // To track meshes for animation
+  const sceneRef = useRef(null);
 
   // Dice Configuration
   const diceTypes = [
-    { type: 'd4', max: 4, color: '#ef4444', shape: 'tetra' },   // Red
-    { type: 'd6', max: 6, color: '#3b82f6', shape: 'box' },     // Blue
-    { type: 'd8', max: 8, color: '#22c55e', shape: 'octa' },    // Green
-    { type: 'd10', max: 10, color: '#d946ef', shape: 'deca' },  // Fuschia
-    { type: 'd12', max: 12, color: '#f97316', shape: 'dodeca' },// Orange
-    { type: 'd20', max: 20, color: '#eab308', shape: 'ico' },   // Yellow
-    { type: 'd100', max: 100, color: '#06b6d4', shape: 'ico' }, // Cyan
-    { type: 'd1000', max: 1000, color: '#ffffff', shape: 'sphere' }, // White
+    { type: 'd4', max: 4, color: '#ef4444', shape: 'tetra' },
+    { type: 'd6', max: 6, color: '#3b82f6', shape: 'box' },
+    { type: 'd8', max: 8, color: '#22c55e', shape: 'octa' },
+    { type: 'd10', max: 10, color: '#d946ef', shape: 'deca' },
+    { type: 'd12', max: 12, color: '#f97316', shape: 'dodeca' },
+    { type: 'd20', max: 20, color: '#eab308', shape: 'ico' },
+    { type: 'd100', max: 100, color: '#06b6d4', shape: 'ico' },
+    { type: 'd1000', max: 1000, color: '#ffffff', shape: 'sphere' },
   ];
 
   const addDie = (type) => {
@@ -379,43 +380,79 @@ const DiceRoller = ({ onClose }) => {
     setSelection(newSel);
   };
 
-  // Helper: Create a texture with the number drawn on it
-  const createNumberTexture = (text, colorHex, shape) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    
-    // Background color
-    ctx.fillStyle = colorHex;
-    ctx.fillRect(0, 0, 256, 256);
+  // --- TEXTURE GENERATION FACTORY ---
+  // This creates the visual look of numbers on the dice faces
+  const createDiceMaterials = (resultValue, config) => {
+    const materials = [];
+    const THREE = window.THREE;
 
-    // Borders/Texture detail
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(0, 0, 256, 256);
+    const createFaceTexture = (text, bgColor) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      
+      // Base
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, 128, 128);
+      
+      // Border/Edge simulation
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(0,0,128,128);
 
-    // Text
-    ctx.fillStyle = '#000000'; // Black text
-    if (shape === 'd1000') ctx.fillStyle = '#000000'; // Specific contrast
-    
-    ctx.font = 'bold 120px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Draw text multiple times for primitive wrapping
-    ctx.fillText(text, 128, 128);
-    
-    // Add some noise/texture so it looks solid
-    const texture = new window.THREE.CanvasTexture(canvas);
-    return texture;
+      // Text
+      ctx.fillStyle = config.type === 'd1000' ? '#000' : '#fff';
+      ctx.font = 'bold 64px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Shadow
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 4;
+      
+      ctx.fillText(text, 64, 64);
+      return new THREE.CanvasTexture(canvas);
+    };
+
+    // Specific logic for D6 (Box) to map standard faces
+    if (config.shape === 'box') {
+        const sides = [1, 6, 2, 5, 3, 4]; // Standard opposing pairs
+        // We want the 'resultValue' to appear on the side that ends up "Up".
+        // For visual simplicity in this physics sim, we map the result to all sides 
+        // briefly or map standard sides. To mimic D&D Beyond perfectly without 
+        // complex quaternion math, we assign the Result to a specific material index
+        // and rotate the cube at the end to face that index up.
+        
+        // Simpler approach for code-only: Map standard numbers
+        for(let i=0; i<6; i++) {
+           materials.push(new THREE.MeshStandardMaterial({ 
+               map: createFaceTexture((i+1).toString(), config.color),
+               roughness: 0.1,
+               metalness: 0.1
+           }));
+        }
+    } else {
+        // For complex shapes (d20, d12), drawing distinct numbers on correct faces 
+        // without UV mapping a 3D model file is extremely hard mathematically.
+        // VISUAL HACK: We create a texture that has the RESULT large, 
+        // and use that for the material.
+        const mat = new THREE.MeshStandardMaterial({ 
+            map: createFaceTexture(resultValue.toString(), config.color),
+            roughness: 0.1,
+            metalness: 0.1
+        });
+        return mat; // Return single material
+    }
+
+    return materials;
   };
 
   const rollDice = () => {
     if (selection.length === 0) return;
     setMode('rolling');
     
-    // Pre-calculate results
+    // Determine results
     const newResults = selection.map(die => {
       const config = diceTypes.find(d => d.type === die.type);
       return {
@@ -427,11 +464,9 @@ const DiceRoller = ({ onClose }) => {
     
     setResults(newResults);
     setTotal(newResults.reduce((acc, curr) => acc + curr.value, 0));
-
-    // Time handling handles in animation loop now
   };
 
-  // 3D Physics Effect
+  // 3D Physics & Logic
   useEffect(() => {
     if (mode !== 'rolling' || !mountRef.current) return;
 
@@ -446,85 +481,81 @@ const DiceRoller = ({ onClose }) => {
         const height = window.innerHeight;
 
         scene = new THREE.Scene();
-        // Camera positioned further back for larger dice
-        camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 2000);
-        camera.position.z = 120; 
+        sceneRef.current = scene;
+        
+        // Use Orthographic camera for better "Tabletop" feel or Persp?
+        // Perspective is more dramatic.
+        camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.z = 80; 
 
         renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
         renderer.setSize(width, height);
         mountRef.current.appendChild(renderer.domElement);
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
-        const pointLight = new THREE.PointLight(0xffffff, 1);
-        pointLight.position.set(50, 50, 50);
-        scene.add(pointLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(20, 50, 20);
+        scene.add(dirLight);
 
-        // Calculate Screen Boundaries in 3D Space at z=0
-        // Tan(FOV/2) * Distance = Height/2
+        // Screen Boundaries calculation
         const vFOV = camera.fov * Math.PI / 180;
-        const visibleHeight = 2 * Math.tan(vFOV / 2) * Math.abs(camera.position.z);
+        const visibleHeight = 2 * Math.tan(vFOV / 2) * 80; // z dist
         const visibleWidth = visibleHeight * camera.aspect;
         
         const bounds = {
-            xMin: -visibleWidth / 2 + 5,
-            xMax: visibleWidth / 2 - 5,
-            yMin: -visibleHeight / 2 + 5, // Floor
-            yMax: visibleHeight / 2 - 5,
+            x: visibleWidth / 2 - 4, // Padding
+            y: visibleHeight / 2 - 4
         };
 
-        // Create Geometries
-        results.forEach((dieResult, index) => {
+        // Create Dice Meshes
+        results.forEach((res) => {
             let geometry;
-            // SIZE INCREASED: Base size 6-8 units (prev was 1.5)
-            switch(dieResult.config.shape) {
-                case 'tetra': geometry = new THREE.TetrahedronGeometry(7); break;
-                case 'box': geometry = new THREE.BoxGeometry(9, 9, 9); break;
-                case 'octa': geometry = new THREE.OctahedronGeometry(6); break;
-                case 'deca': geometry = new THREE.OctahedronGeometry(6); geometry.scale(1, 1.4, 1); break;
-                case 'dodeca': geometry = new THREE.DodecahedronGeometry(6.5); break;
-                case 'ico': geometry = new THREE.IcosahedronGeometry(6.5); break;
-                case 'sphere': geometry = new THREE.SphereGeometry(7, 32, 32); break;
-                default: geometry = new THREE.BoxGeometry(8, 8, 8);
+            let size = 6; 
+            
+            switch(res.config.shape) {
+                case 'tetra': geometry = new THREE.TetrahedronGeometry(size); break;
+                case 'box': geometry = new THREE.BoxGeometry(size, size, size); break;
+                case 'octa': geometry = new THREE.OctahedronGeometry(size*0.8); break;
+                case 'deca': geometry = new THREE.OctahedronGeometry(size*0.8); geometry.scale(1, 1.4, 1); break;
+                case 'dodeca': geometry = new THREE.DodecahedronGeometry(size*0.9); break;
+                case 'ico': geometry = new THREE.IcosahedronGeometry(size*0.9); break;
+                case 'sphere': geometry = new THREE.SphereGeometry(size, 32, 32); break;
+                default: geometry = new THREE.BoxGeometry(size, size, size);
             }
 
-            // Create Texture with the Result Number
-            const texture = createNumberTexture(
-                dieResult.config.shape === 'd1000' ? '?' : dieResult.value.toString(), 
-                dieResult.config.color,
-                dieResult.config.shape
-            );
+            const mats = createDiceMaterials(res.value, res.config);
+            const mesh = new THREE.Mesh(geometry, mats);
 
-            const material = new THREE.MeshStandardMaterial({ 
-                map: texture,
-                roughness: 0.1,
-                metalness: 0.1,
-            });
-            
-            const mesh = new THREE.Mesh(geometry, material);
-            
-            // Initial Random Position (Centerish burst)
+            // Random Start Pos (Center burst)
             mesh.position.set(
-                (Math.random() - 0.5) * 20,
-                (Math.random() - 0.5) * 20,
+                (Math.random()-0.5) * 10, 
+                (Math.random()-0.5) * 10, 
+                0
+            );
+            
+            // Initial Velocity (Explosion)
+            const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 4,
+                (Math.random() - 0.5) * 4,
                 0
             );
 
-            // Physics Data
+            // Random Rotation speed (tumbling)
+            const rotSpeed = new THREE.Vector3(
+                0.2 + Math.random() * 0.3,
+                0.2 + Math.random() * 0.3,
+                0.2 + Math.random() * 0.3
+            );
+
             mesh.userData = {
-                velocity: new THREE.Vector3(
-                    (Math.random() - 0.5) * 4, // X Burst
-                    (Math.random() - 0.5) * 4, // Y Burst
-                    (Math.random() - 0.5) * 2  // Z Depth
-                ),
-                rotationSpeed: new THREE.Vector3(
-                    Math.random() * 0.4,
-                    Math.random() * 0.4,
-                    Math.random() * 0.4
-                ),
+                velocity,
+                rotSpeed,
                 stopped: false,
-                restingFrames: 0
+                restCount: 0,
+                finalValue: res.value,
+                shape: res.config.shape
             };
 
             scene.add(mesh);
@@ -532,102 +563,78 @@ const DiceRoller = ({ onClose }) => {
         });
 
         // Animation Loop
-        let frameCount = 0;
-        let vanishing = false;
-
         const animate = () => {
             animationId = requestAnimationFrame(animate);
-            frameCount++;
 
-            // Vanish Animation Logic
-            if (vanishing) {
-                let allGone = true;
-                diceRefs.current.forEach(mesh => {
-                    // Shrink
-                    mesh.scale.multiplyScalar(0.9);
-                    mesh.rotation.y += 0.2;
-                    if (mesh.scale.x > 0.01) allGone = false;
-                });
-                renderer.render(scene, camera);
-                if (allGone) {
-                    cancelAnimationFrame(animationId);
-                    onClose();
-                }
-                return;
-            }
-
-            // Physics Loop
             let allStopped = true;
 
             diceRefs.current.forEach(mesh => {
-                if (mesh.userData.stopped) return;
-
-                allStopped = false;
-
-                // Position Update
-                mesh.position.add(mesh.userData.velocity);
-                
-                // Rotation Update
-                mesh.rotation.x += mesh.userData.rotationSpeed.x;
-                mesh.rotation.y += mesh.userData.rotationSpeed.y;
-                mesh.rotation.z += mesh.userData.rotationSpeed.z;
-
-                // Friction / Air Resistance
-                mesh.userData.velocity.multiplyScalar(0.98);
-                mesh.userData.rotationSpeed.multiplyScalar(0.98);
-
-                // Wall Collisions (Dynamic Borders)
-                // Left/Right
-                if (mesh.position.x < bounds.xMin || mesh.position.x > bounds.xMax) {
-                    mesh.userData.velocity.x *= -0.7; // Bounce
-                    // Push back inside
-                    mesh.position.x = mesh.position.x < bounds.xMin ? bounds.xMin : bounds.xMax;
-                    // Add spin on hit
-                    mesh.userData.rotationSpeed.z += (Math.random()-0.5) * 0.2;
+                // VANISH MODE
+                if (mode === 'vanishing') {
+                    mesh.scale.multiplyScalar(0.9);
+                    mesh.rotation.y += 0.2;
+                    return;
                 }
 
-                // Top/Bottom (Floor)
-                if (mesh.position.y < bounds.yMin || mesh.position.y > bounds.yMax) {
-                    mesh.userData.velocity.y *= -0.7;
-                    mesh.position.y = mesh.position.y < bounds.yMin ? bounds.yMin : bounds.yMax;
-                    mesh.userData.rotationSpeed.x += (Math.random()-0.5) * 0.2;
-                }
+                // PHYSICS
+                if (!mesh.userData.stopped) {
+                    allStopped = false;
 
-                // Z-Depth collisions (Keep them in a box)
-                if (mesh.position.z < -20 || mesh.position.z > 20) {
-                     mesh.userData.velocity.z *= -0.7;
-                     mesh.position.z = mesh.position.z < -20 ? -20 : 20;
-                }
+                    // Move
+                    mesh.position.add(mesh.userData.velocity);
+                    
+                    // Rotate
+                    mesh.rotation.x += mesh.userData.rotSpeed.x;
+                    mesh.rotation.y += mesh.userData.rotSpeed.y;
+                    mesh.rotation.z += mesh.userData.rotSpeed.z;
 
-                // Stop Logic (Threshold)
-                if (mesh.userData.velocity.length() < 0.1 && 
-                    mesh.userData.rotationSpeed.length() < 0.1) {
-                    mesh.userData.restingFrames++;
-                } else {
-                    mesh.userData.restingFrames = 0;
-                }
+                    // Friction (Slow down)
+                    mesh.userData.velocity.multiplyScalar(0.97); 
+                    mesh.userData.rotSpeed.multiplyScalar(0.97);
 
-                // If resting for 20 frames, snap to stop
-                if (mesh.userData.restingFrames > 20) {
-                    mesh.userData.stopped = true;
-                    // Align slightly to camera? No, physics is cooler chaotic
+                    // Bounce Wall X
+                    if (mesh.position.x > bounds.x || mesh.position.x < -bounds.x) {
+                        mesh.userData.velocity.x *= -0.8;
+                        mesh.position.x = Math.sign(mesh.position.x) * bounds.x;
+                        mesh.userData.rotSpeed.z += (Math.random()-0.5)*0.2;
+                    }
+
+                    // Bounce Wall Y
+                    if (mesh.position.y > bounds.y || mesh.position.y < -bounds.y) {
+                        mesh.userData.velocity.y *= -0.8;
+                        mesh.position.y = Math.sign(mesh.position.y) * bounds.y;
+                        mesh.userData.rotSpeed.x += (Math.random()-0.5)*0.2;
+                    }
+
+                    // Stop Check
+                    if (mesh.userData.velocity.length() < 0.05 && mesh.userData.rotSpeed.length() < 0.05) {
+                        mesh.userData.restCount++;
+                        if (mesh.userData.restCount > 20) {
+                            mesh.userData.stopped = true;
+                            // Snap to flat (simplified)
+                            mesh.rotation.x = Math.round(mesh.rotation.x / (Math.PI/2)) * (Math.PI/2);
+                            mesh.rotation.y = Math.round(mesh.rotation.y / (Math.PI/2)) * (Math.PI/2);
+                        }
+                    } else {
+                        mesh.userData.restCount = 0;
+                    }
                 }
             });
 
             renderer.render(scene, camera);
 
-            // Auto-Vanish Trigger
-            // If all stopped, wait 8 seconds (roughly 480 frames) then vanish
-            if (allStopped) {
-                if (!window.vanishTimerStart) window.vanishTimerStart = Date.now();
-                if (Date.now() - window.vanishTimerStart > 8000) {
-                    vanishing = true;
-                    setMode('vanishing');
-                }
-            } else {
-                window.vanishTimerStart = null;
+            // Handle Vanishing Trigger
+            if (allStopped && mode === 'rolling') {
+               // Wait 3 seconds then vanish
+               if (!window.vanishTimeout) {
+                   window.vanishTimeout = setTimeout(() => {
+                       setMode('vanishing');
+                       setTimeout(onClose, 1000); // Close after shrink anim
+                   }, 3000); // Keep results on screen for 3s after stop
+               }
             }
         };
+
         animate();
     };
 
@@ -642,27 +649,30 @@ const DiceRoller = ({ onClose }) => {
 
     return () => {
         cancelAnimationFrame(animationId);
-        window.vanishTimerStart = null;
+        if (window.vanishTimeout) clearTimeout(window.vanishTimeout);
+        window.vanishTimeout = null;
         if (mountRef.current && renderer) {
-            mountRef.current.innerHTML = ''; // Clean cleanup
+            mountRef.current.innerHTML = '';
             renderer.dispose();
         }
     };
   }, [mode, results]);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    // STEP 1 & 10: Interaction Logic
+    // z-[200] ensures it's on top.
+    // 'pointer-events-none' on the CONTAINER lets you click through to the page behind.
+    <div className={`fixed inset-0 z-[200] flex items-center justify-center ${mode === 'menu' ? 'bg-black/80 pointer-events-auto' : 'pointer-events-none'}`}>
       
-      {/* MENU MODE */}
+      {/* MENU MODE - Pointer Events Auto so you can click buttons */}
       {mode === 'menu' && (
-        <div className="bg-gradient-to-b from-slate-900 to-purple-900 border-2 border-cyan-500 rounded-2xl p-8 max-w-2xl w-full shadow-[0_0_50px_rgba(34,211,238,0.5)] relative">
+        <div className="bg-gradient-to-b from-slate-900 to-purple-900 border-2 border-cyan-500 rounded-2xl p-8 max-w-2xl w-full shadow-[0_0_50px_rgba(34,211,238,0.5)] relative pointer-events-auto">
             <button onClick={onClose} className="absolute top-4 right-4 text-cyan-400 hover:text-white"><XCircle /></button>
             
             <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-6 text-center flex items-center justify-center gap-3">
                 <Dices className="w-8 h-8" /> QUANTUM DICE ROLLER
             </h2>
 
-            {/* Selection Area */}
             <div className="flex flex-wrap gap-4 justify-center mb-8">
                 {diceTypes.map((d) => (
                     <button 
@@ -676,7 +686,6 @@ const DiceRoller = ({ onClose }) => {
                 ))}
             </div>
 
-            {/* Current Selection */}
             <div className="bg-black/50 rounded-xl p-4 min-h-[100px] mb-8 border border-white/10">
                 <div className="text-sm text-gray-400 mb-2">Selected Dice ({selection.length}):</div>
                 <div className="flex flex-wrap gap-2">
@@ -695,28 +704,33 @@ const DiceRoller = ({ onClose }) => {
                 disabled={selection.length === 0}
                 className="w-full py-4 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-black text-xl hover:from-cyan-500 hover:to-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(34,211,238,0.4)]"
             >
-                INITIATE ROLL
+                ROLL
             </button>
         </div>
       )}
 
-      {/* ROLLING/RESULT MODE OVERLAY */}
+      {/* ROLLING MODE */}
       {(mode === 'rolling' || mode === 'vanishing') && (
-        <div className="fixed inset-0 pointer-events-none">
-            {/* 3D Container */}
-            <div ref={mountRef} className="absolute inset-0 z-0" />
+        <div className="fixed inset-0 w-full h-full">
+            {/* 3D Container - Pointer events none lets clicks pass through */}
+            <div ref={mountRef} className="absolute inset-0 z-0 pointer-events-none" />
             
-            {/* Results Sidebar */}
-            <div className={`absolute right-0 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-md p-6 rounded-l-2xl border-l-2 border-y-2 border-cyan-500 transform transition-all duration-500 min-w-[200px] ${mode === 'vanishing' ? 'opacity-0 translate-x-full' : 'animate-[slideInRight_0.5s_ease-out]'}`}>
-                <h3 className="text-cyan-400 font-bold mb-4 border-b border-cyan-500/30 pb-2">RESULTS</h3>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {/* Results Sidebar - Pointer events AUTO so you can interact with it if needed */}
+            <div className={`absolute right-0 top-20 pointer-events-auto bg-black/80 backdrop-blur-md p-6 rounded-l-2xl border-l-2 border-y-2 border-cyan-500 transform transition-all duration-500 min-w-[200px] ${mode === 'vanishing' ? 'opacity-0 translate-x-full' : 'animate-[slideInRight_0.5s_ease-out]'}`}>
+                <div className="flex justify-between items-center mb-4 border-b border-cyan-500/30 pb-2">
+                    <h3 className="text-cyan-400 font-bold">RESULTS</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20}/></button>
+                </div>
+                
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
                     {results.map((res, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-lg">
+                        <div key={idx} className="flex justify-between items-center text-lg animate-in fade-in slide-in-from-right-10 duration-300" style={{animationDelay: `${idx * 100}ms`}}>
                             <span className="text-gray-400 uppercase text-sm">{res.type}</span>
                             <span className="font-bold font-mono text-2xl" style={{ color: res.config.color }}>{res.value}</span>
                         </div>
                     ))}
                 </div>
+                
                 <div className="mt-6 pt-4 border-t border-cyan-500/50">
                     <div className="flex justify-between items-center">
                         <span className="text-purple-300 font-bold">TOTAL</span>
@@ -724,7 +738,7 @@ const DiceRoller = ({ onClose }) => {
                     </div>
                 </div>
             </div>
-            <style>{`@keyframes slideInRight { from { transform: translate(100%, -50%); } to { transform: translate(0, -50%); } }`}</style>
+            <style>{`@keyframes slideInRight { from { transform: translate(100%, 0); } to { transform: translate(0, 0); } }`}</style>
         </div>
       )}
     </div>
