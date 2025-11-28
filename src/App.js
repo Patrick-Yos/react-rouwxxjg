@@ -348,9 +348,9 @@ const ArcadeOverlay = ({ onClose }) => {
   );
 };
 //--Dice COMPONENT---
-// --- NEW COMPONENT: FANTASTIC DICE ROLLER (BLOB LOADER) ---
+// --- NEW COMPONENT: FANTASTIC DICE ROLLER (ROBUST LOADER) ---
 const DiceRoller = ({ onClose }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [status, setStatus] = useState('loading'); // loading, ready, error
   const [pool, setPool] = useState([]); 
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState(null);
@@ -358,90 +358,96 @@ const DiceRoller = ({ onClose }) => {
   const containerId = 'dice-box-container';
   const boxRef = useRef(null);
 
-  // --- THE MAGIC LOADER ---
-  // This bypasses the "Dynamic Import" error by creating a script from a Blob
+  // --- 1. SCRIPT INJECTION ---
   useEffect(() => {
+    // If already loaded globally, skip injection
     if (window.DiceBox) {
       initDiceBox();
       return;
     }
 
-    // 1. We write the module code as a simple string so Webpack ignores it
+    // Create a Blob script to bypass bundler restrictions
+    // We use version 1.0.18 which is very stable
     const moduleCode = `
-      import DiceBox from 'https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/dice-box.es.min.js';
+      import DiceBox from 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box@1.0.18/dist/dice-box.es.min.js';
       window.DiceBox = DiceBox;
       window.dispatchEvent(new Event('dicebox-ready'));
     `;
 
-    // 2. Convert string to a Blob URL (virtual file)
     const blob = new Blob([moduleCode], { type: 'application/javascript' });
     const scriptUrl = URL.createObjectURL(blob);
-
-    // 3. Inject script tag pointing to the Blob
     const script = document.createElement('script');
     script.type = 'module';
     script.src = scriptUrl;
     document.body.appendChild(script);
 
-    // 4. Listen for the ready event
     const handleReady = () => initDiceBox();
     window.addEventListener('dicebox-ready', handleReady);
 
     return () => {
       window.removeEventListener('dicebox-ready', handleReady);
-      URL.revokeObjectURL(scriptUrl); // Cleanup memory
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
+      URL.revokeObjectURL(scriptUrl);
     };
   }, []);
 
+  // --- 2. INITIALIZATION LOGIC ---
   const initDiceBox = async () => {
-    if (boxRef.current) return;
-
-    // Wait slightly to ensure window.DiceBox is fully attached
-    if (!window.DiceBox) {
-        setTimeout(initDiceBox, 200);
+    // Safety check: Ensure the container div exists in the DOM
+    const container = document.getElementById(containerId);
+    if (!container) {
+        setTimeout(initDiceBox, 100); // Retry if React hasn't rendered div yet
         return;
     }
 
+    if (boxRef.current) return;
+
     try {
+      // Initialize with JSDELIVR assets (Faster & CORS friendly)
       const Box = new window.DiceBox("#" + containerId, {
-        assetPath: "https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/assets/",
-        theme: "default", 
+        assetPath: "https://cdn.jsdelivr.net/npm/@3d-dice/dice-box@1.0.18/dist/assets/",
+        theme: "default",
         themeColor: "#06b6d4", // Cyan
-        offscreen: true,
-        scale: 6 // Large dice
+        scale: 6,
+        offscreen: true // Important for performance
       });
 
       await Box.init();
       boxRef.current = Box;
-      setIsLoaded(true);
+      setStatus('ready');
 
-      // Event Listener
+      // Setup Results Handler
       Box.onRollComplete = (rollResults) => {
         let sum = 0;
         const resArray = [];
         
-        rollResults.forEach(r => {
-           sum += r.value;
-           resArray.push({ type: r.type, value: r.value });
+        // Handle differences in result format between versions
+        const rolls = Array.isArray(rollResults) ? rollResults : [rollResults];
+        
+        rolls.forEach(r => {
+           // r.value is the result, r.groupId is the dice type usually
+           // We fallback to checking the inputs if type is missing
+           let val = r.value;
+           sum += val;
+           // Attempt to guess type from sides if explicit type is missing
+           let type = r.sides ? `d${r.sides}` : 'die';
+           resArray.push({ type: type, value: val });
         });
 
         setResults(resArray);
         setTotal(sum);
         
-        // Auto vanish results
+        // Auto vanish results after 6s
         setTimeout(() => {
             if (boxRef.current) boxRef.current.clear();
             setResults(null);
             setTotal(0);
             setRolling(false);
-        }, 8000);
+        }, 6000);
       };
 
     } catch (error) {
       console.error("DiceBox Init Error:", error);
+      setStatus('error');
     }
   };
 
@@ -462,14 +468,19 @@ const DiceRoller = ({ onClose }) => {
     setResults(null);
     setTotal(0);
 
-    // Convert d1000 to 3d10, others standard
-    const rollPayload = pool.map(die => {
-        if (die === 'd1000') return '3d10'; 
-        return '1' + die;
+    // Format: Array of strings ["d20", "d6", "d10"]
+    // d1000 is simulated as 3d10
+    const finalPool = [];
+    pool.forEach(die => {
+        if (die === 'd1000') {
+            finalPool.push('d10', 'd10', 'd10');
+        } else {
+            finalPool.push(die);
+        }
     });
 
     try {
-        await boxRef.current.roll(rollPayload);
+        await boxRef.current.roll(finalPool);
     } catch (e) {
         console.error("Roll failed", e);
         setRolling(false);
@@ -495,7 +506,7 @@ const DiceRoller = ({ onClose }) => {
             if (e.target === e.currentTarget && !rolling) onClose();
         }}></div>
 
-        {/* 3D RENDER LAYER */}
+        {/* 3D CANVAS LAYER */}
         <div 
             id={containerId} 
             className="absolute inset-0 z-10 pointer-events-none"
@@ -515,7 +526,7 @@ const DiceRoller = ({ onClose }) => {
                     <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
                         {results.map((r, i) => (
                             <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm text-cyan-200 font-mono">
-                                {r.type.replace('d10', '') === '' && pool.includes('d1000') ? '?' : r.type}: {r.value}
+                                {r.type}: {r.value}
                             </span>
                         ))}
                     </div>
@@ -540,7 +551,7 @@ const DiceRoller = ({ onClose }) => {
                         <button
                             key={opt.type}
                             onClick={() => addToPool(opt.type)}
-                            disabled={!isLoaded || rolling}
+                            disabled={status !== 'ready' || rolling}
                             className="group relative w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-900/50 transition-all active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center gap-1"
                         >
                             <span className="text-xs font-bold text-cyan-100">{opt.label}</span>
@@ -567,7 +578,7 @@ const DiceRoller = ({ onClose }) => {
                     
                     <button
                         onClick={rollDice}
-                        disabled={pool.length === 0 || rolling || !isLoaded}
+                        disabled={pool.length === 0 || rolling || status !== 'ready'}
                         className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-bold text-lg hover:from-cyan-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {rolling ? (
@@ -580,10 +591,16 @@ const DiceRoller = ({ onClose }) => {
                     </button>
                 </div>
                 
-                {!isLoaded && (
+                {/* STATUS INDICATOR */}
+                {status === 'loading' && (
                     <div className="text-center text-xs text-yellow-500 animate-pulse">
                         <span className="inline-block animate-spin mr-2">⚙️</span>
-                        Initializing Physics Engine...
+                        Initializing Physics...
+                    </div>
+                )}
+                {status === 'error' && (
+                    <div className="text-center text-xs text-red-400">
+                        Failed to load Physics Engine. Please refresh.
                     </div>
                 )}
             </div>
