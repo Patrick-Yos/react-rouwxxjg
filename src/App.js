@@ -348,399 +348,231 @@ const ArcadeOverlay = ({ onClose }) => {
   );
 };
 //--Dice COMPONENT---
-// --- NEW COMPONENT: 3D DICE ROLLER (ADVANCED) ---
+// --- NEW COMPONENT: FANTASTIC DICE ROLLER (D&D BEYOND STYLE) ---
 const DiceRoller = ({ onClose }) => {
-  const [mode, setMode] = useState('menu'); // menu, rolling, result, vanishing
-  const [selection, setSelection] = useState([]); 
-  const [results, setResults] = useState([]);
+  const [diceBox, setDiceBox] = useState(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [pool, setPool] = useState([]); // Array of strings like ['d20', 'd6']
+  const [rolling, setRolling] = useState(false);
+  const [results, setResults] = useState(null);
   const [total, setTotal] = useState(0);
-  const mountRef = useRef(null);
-  const diceRefs = useRef([]); // To track meshes for animation
-  const sceneRef = useRef(null);
+  const containerId = 'dice-box-container';
 
-  // Dice Configuration
-  const diceTypes = [
-    { type: 'd4', max: 4, color: '#ef4444', shape: 'tetra' },
-    { type: 'd6', max: 6, color: '#3b82f6', shape: 'box' },
-    { type: 'd8', max: 8, color: '#22c55e', shape: 'octa' },
-    { type: 'd10', max: 10, color: '#d946ef', shape: 'deca' },
-    { type: 'd12', max: 12, color: '#f97316', shape: 'dodeca' },
-    { type: 'd20', max: 20, color: '#eab308', shape: 'ico' },
-    { type: 'd100', max: 100, color: '#06b6d4', shape: 'ico' },
-    { type: 'd1000', max: 1000, color: '#ffffff', shape: 'sphere' },
+  // Load the library from CDN on mount
+  useEffect(() => {
+    let boxInstance = null;
+
+    const loadDiceBox = async () => {
+      try {
+        // Dynamically import the ES module from unpkg
+        const DiceBox = (await import('https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/dice-box.es.min.js')).default;
+        
+        // Initialize the Dice Box
+        boxInstance = new DiceBox("#" + containerId, {
+          assetPath: "https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/assets/", // Assets from CDN
+          theme: "default", // You can change this to 'diceOfRolling', 'gemstone', etc.
+          themeColor: "#06b6d4", // Cyan color to match your theme
+          offscreen: true,
+          scale: 6, // Make them nice and big
+          gravity: 3,
+          mass: 5,
+          friction: 0.8
+        });
+
+        await boxInstance.init();
+        setDiceBox(boxInstance);
+        setIsLoaded(true);
+
+        // Listen for results
+        boxInstance.onRollComplete = (rollResults) => {
+          // Calculate total
+          let sum = 0;
+          const resArray = [];
+          
+          rollResults.forEach(r => {
+             sum += r.value;
+             resArray.push({ type: r.type, value: r.value });
+          });
+
+          setResults(resArray);
+          setTotal(sum);
+          
+          // Auto vanish after 5 seconds
+          setTimeout(() => {
+            boxInstance.clear();
+            setResults(null);
+            setTotal(0);
+            setRolling(false);
+            // Optional: onClose(); // Uncomment if you want the whole widget to close
+          }, 5000);
+        };
+
+      } catch (error) {
+        console.error("Failed to load DiceBox:", error);
+      }
+    };
+
+    loadDiceBox();
+
+    // Cleanup
+    return () => {
+      // DiceBox doesn't have a clean destroy method in this version, 
+      // but we clear the container refs
+    };
+  }, []);
+
+  const addToPool = (type) => {
+    if (rolling) return;
+    setPool([...pool, type]);
+    // Optional: play a click sound here
+  };
+
+  const clearPool = () => {
+    if (rolling) return;
+    setPool([]);
+  };
+
+  const rollDice = async () => {
+    if (!diceBox || pool.length === 0 || rolling) return;
+    
+    setRolling(true);
+    setResults(null);
+    setTotal(0);
+
+    // Convert pool array ['d20', 'd6', 'd20'] to notation "2d20+1d6" or array of objects
+    // The library accepts an array of strings like ["2d20", "1d6"] 
+    // OR just a list of dice types to roll individually. 
+    
+    // Simple approach: map our pool directly.
+    // However, d1000 isn't standard. We will simulate d1000 by rolling a d10 and d100? 
+    // Or just 3d10. Let's use 3d10 for d1000 as it's the physical standard.
+    
+    const rollPayload = pool.map(die => {
+        if (die === 'd1000') return '3d10'; // Simulate 1000 with 3 d10s
+        return '1' + die;
+    });
+
+    try {
+        await diceBox.roll(rollPayload);
+    } catch (e) {
+        console.error("Roll failed", e);
+        setRolling(false);
+    }
+  };
+
+  const diceOptions = [
+    { type: 'd4', label: 'D4', icon: 'pyramid' },
+    { type: 'd6', label: 'D6', icon: 'box' },
+    { type: 'd8', label: 'D8', icon: 'diamond' },
+    { type: 'd10', label: 'D10', icon: 'kite' },
+    { type: 'd12', label: 'D12', icon: 'dodeca' },
+    { type: 'd20', label: 'D20', icon: 'hex' },
+    { type: 'd100', label: 'D100', icon: 'circle' },
+    { type: 'd1000', label: 'D1K', icon: 'star' }, // Will roll 3d10
   ];
 
-  const addDie = (type) => {
-    setSelection([...selection, { type, id: Date.now() + Math.random() }]);
-  };
-
-  const removeDie = (index) => {
-    const newSel = [...selection];
-    newSel.splice(index, 1);
-    setSelection(newSel);
-  };
-
-  // --- TEXTURE GENERATION FACTORY ---
-  // This creates the visual look of numbers on the dice faces
-  const createDiceMaterials = (resultValue, config) => {
-    const materials = [];
-    const THREE = window.THREE;
-
-    const createFaceTexture = (text, bgColor) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      
-      // Base
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, 128, 128);
-      
-      // Border/Edge simulation
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-      ctx.lineWidth = 8;
-      ctx.strokeRect(0,0,128,128);
-
-      // Text
-      ctx.fillStyle = config.type === 'd1000' ? '#000' : '#fff';
-      ctx.font = 'bold 64px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      // Shadow
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 4;
-      
-      ctx.fillText(text, 64, 64);
-      return new THREE.CanvasTexture(canvas);
-    };
-
-    // Specific logic for D6 (Box) to map standard faces
-    if (config.shape === 'box') {
-        const sides = [1, 6, 2, 5, 3, 4]; // Standard opposing pairs
-        // We want the 'resultValue' to appear on the side that ends up "Up".
-        // For visual simplicity in this physics sim, we map the result to all sides 
-        // briefly or map standard sides. To mimic D&D Beyond perfectly without 
-        // complex quaternion math, we assign the Result to a specific material index
-        // and rotate the cube at the end to face that index up.
-        
-        // Simpler approach for code-only: Map standard numbers
-        for(let i=0; i<6; i++) {
-           materials.push(new THREE.MeshStandardMaterial({ 
-               map: createFaceTexture((i+1).toString(), config.color),
-               roughness: 0.1,
-               metalness: 0.1
-           }));
-        }
-    } else {
-        // For complex shapes (d20, d12), drawing distinct numbers on correct faces 
-        // without UV mapping a 3D model file is extremely hard mathematically.
-        // VISUAL HACK: We create a texture that has the RESULT large, 
-        // and use that for the material.
-        const mat = new THREE.MeshStandardMaterial({ 
-            map: createFaceTexture(resultValue.toString(), config.color),
-            roughness: 0.1,
-            metalness: 0.1
-        });
-        return mat; // Return single material
-    }
-
-    return materials;
-  };
-
-  const rollDice = () => {
-    if (selection.length === 0) return;
-    setMode('rolling');
-    
-    // Determine results
-    const newResults = selection.map(die => {
-      const config = diceTypes.find(d => d.type === die.type);
-      return {
-        ...die,
-        value: Math.floor(Math.random() * config.max) + 1,
-        config: config
-      };
-    });
-    
-    setResults(newResults);
-    setTotal(newResults.reduce((acc, curr) => acc + curr.value, 0));
-  };
-
-  // 3D Physics & Logic
-  useEffect(() => {
-    if (mode !== 'rolling' || !mountRef.current) return;
-
-    let scene, camera, renderer, animationId;
-    diceRefs.current = [];
-
-    const init = () => {
-        const THREE = window.THREE;
-        if (!THREE) return;
-
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        scene = new THREE.Scene();
-        sceneRef.current = scene;
-        
-        // Use Orthographic camera for better "Tabletop" feel or Persp?
-        // Perspective is more dramatic.
-        camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.z = 80; 
-
-        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(width, height);
-        mountRef.current.appendChild(renderer.domElement);
-
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(20, 50, 20);
-        scene.add(dirLight);
-
-        // Screen Boundaries calculation
-        const vFOV = camera.fov * Math.PI / 180;
-        const visibleHeight = 2 * Math.tan(vFOV / 2) * 80; // z dist
-        const visibleWidth = visibleHeight * camera.aspect;
-        
-        const bounds = {
-            x: visibleWidth / 2 - 4, // Padding
-            y: visibleHeight / 2 - 4
-        };
-
-        // Create Dice Meshes
-        results.forEach((res) => {
-            let geometry;
-            let size = 6; 
-            
-            switch(res.config.shape) {
-                case 'tetra': geometry = new THREE.TetrahedronGeometry(size); break;
-                case 'box': geometry = new THREE.BoxGeometry(size, size, size); break;
-                case 'octa': geometry = new THREE.OctahedronGeometry(size*0.8); break;
-                case 'deca': geometry = new THREE.OctahedronGeometry(size*0.8); geometry.scale(1, 1.4, 1); break;
-                case 'dodeca': geometry = new THREE.DodecahedronGeometry(size*0.9); break;
-                case 'ico': geometry = new THREE.IcosahedronGeometry(size*0.9); break;
-                case 'sphere': geometry = new THREE.SphereGeometry(size, 32, 32); break;
-                default: geometry = new THREE.BoxGeometry(size, size, size);
-            }
-
-            const mats = createDiceMaterials(res.value, res.config);
-            const mesh = new THREE.Mesh(geometry, mats);
-
-            // Random Start Pos (Center burst)
-            mesh.position.set(
-                (Math.random()-0.5) * 10, 
-                (Math.random()-0.5) * 10, 
-                0
-            );
-            
-            // Initial Velocity (Explosion)
-            const velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 4,
-                (Math.random() - 0.5) * 4,
-                0
-            );
-
-            // Random Rotation speed (tumbling)
-            const rotSpeed = new THREE.Vector3(
-                0.2 + Math.random() * 0.3,
-                0.2 + Math.random() * 0.3,
-                0.2 + Math.random() * 0.3
-            );
-
-            mesh.userData = {
-                velocity,
-                rotSpeed,
-                stopped: false,
-                restCount: 0,
-                finalValue: res.value,
-                shape: res.config.shape
-            };
-
-            scene.add(mesh);
-            diceRefs.current.push(mesh);
-        });
-
-        // Animation Loop
-        const animate = () => {
-            animationId = requestAnimationFrame(animate);
-
-            let allStopped = true;
-
-            diceRefs.current.forEach(mesh => {
-                // VANISH MODE
-                if (mode === 'vanishing') {
-                    mesh.scale.multiplyScalar(0.9);
-                    mesh.rotation.y += 0.2;
-                    return;
-                }
-
-                // PHYSICS
-                if (!mesh.userData.stopped) {
-                    allStopped = false;
-
-                    // Move
-                    mesh.position.add(mesh.userData.velocity);
-                    
-                    // Rotate
-                    mesh.rotation.x += mesh.userData.rotSpeed.x;
-                    mesh.rotation.y += mesh.userData.rotSpeed.y;
-                    mesh.rotation.z += mesh.userData.rotSpeed.z;
-
-                    // Friction (Slow down)
-                    mesh.userData.velocity.multiplyScalar(0.97); 
-                    mesh.userData.rotSpeed.multiplyScalar(0.97);
-
-                    // Bounce Wall X
-                    if (mesh.position.x > bounds.x || mesh.position.x < -bounds.x) {
-                        mesh.userData.velocity.x *= -0.8;
-                        mesh.position.x = Math.sign(mesh.position.x) * bounds.x;
-                        mesh.userData.rotSpeed.z += (Math.random()-0.5)*0.2;
-                    }
-
-                    // Bounce Wall Y
-                    if (mesh.position.y > bounds.y || mesh.position.y < -bounds.y) {
-                        mesh.userData.velocity.y *= -0.8;
-                        mesh.position.y = Math.sign(mesh.position.y) * bounds.y;
-                        mesh.userData.rotSpeed.x += (Math.random()-0.5)*0.2;
-                    }
-
-                    // Stop Check
-                    if (mesh.userData.velocity.length() < 0.05 && mesh.userData.rotSpeed.length() < 0.05) {
-                        mesh.userData.restCount++;
-                        if (mesh.userData.restCount > 20) {
-                            mesh.userData.stopped = true;
-                            // Snap to flat (simplified)
-                            mesh.rotation.x = Math.round(mesh.rotation.x / (Math.PI/2)) * (Math.PI/2);
-                            mesh.rotation.y = Math.round(mesh.rotation.y / (Math.PI/2)) * (Math.PI/2);
-                        }
-                    } else {
-                        mesh.userData.restCount = 0;
-                    }
-                }
-            });
-
-            renderer.render(scene, camera);
-
-            // Handle Vanishing Trigger
-            if (allStopped && mode === 'rolling') {
-               // Wait 3 seconds then vanish
-               if (!window.vanishTimeout) {
-                   window.vanishTimeout = setTimeout(() => {
-                       setMode('vanishing');
-                       setTimeout(onClose, 1000); // Close after shrink anim
-                   }, 3000); // Keep results on screen for 3s after stop
-               }
-            }
-        };
-
-        animate();
-    };
-
-    if (window.THREE) {
-        init();
-    } else {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-        script.onload = init;
-        document.body.appendChild(script);
-    }
-
-    return () => {
-        cancelAnimationFrame(animationId);
-        if (window.vanishTimeout) clearTimeout(window.vanishTimeout);
-        window.vanishTimeout = null;
-        if (mountRef.current && renderer) {
-            mountRef.current.innerHTML = '';
-            renderer.dispose();
-        }
-    };
-  }, [mode, results]);
-
   return (
-    // STEP 1 & 10: Interaction Logic
-    // z-[200] ensures it's on top.
-    // 'pointer-events-none' on the CONTAINER lets you click through to the page behind.
-    <div className={`fixed inset-0 z-[200] flex items-center justify-center ${mode === 'menu' ? 'bg-black/80 pointer-events-auto' : 'pointer-events-none'}`}>
-      
-      {/* MENU MODE - Pointer Events Auto so you can click buttons */}
-      {mode === 'menu' && (
-        <div className="bg-gradient-to-b from-slate-900 to-purple-900 border-2 border-cyan-500 rounded-2xl p-8 max-w-2xl w-full shadow-[0_0_50px_rgba(34,211,238,0.5)] relative pointer-events-auto">
-            <button onClick={onClose} className="absolute top-4 right-4 text-cyan-400 hover:text-white"><XCircle /></button>
+    <div className="fixed inset-0 z-[200] flex items-end justify-center pointer-events-none">
+        
+        {/* BACKGROUND CLICK CAPTURE (To Close) */}
+        <div className="absolute inset-0 z-0 pointer-events-auto" onClick={(e) => {
+            if (e.target === e.currentTarget && !rolling) onClose();
+        }}></div>
+
+        {/* 3D CANVAS CONTAINER (Full Screen) */}
+        <div 
+            id={containerId} 
+            className="absolute inset-0 z-10 pointer-events-none"
+            style={{ width: '100%', height: '100%' }}
+        />
+
+        {/* CONTROLS WIDGET */}
+        <div className="relative z-20 mb-8 pointer-events-auto flex flex-col items-center gap-4 animate-in slide-in-from-bottom-10 duration-500">
             
-            <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-6 text-center flex items-center justify-center gap-3">
-                <Dices className="w-8 h-8" /> QUANTUM DICE ROLLER
-            </h2>
-
-            <div className="flex flex-wrap gap-4 justify-center mb-8">
-                {diceTypes.map((d) => (
-                    <button 
-                        key={d.type}
-                        onClick={() => addDie(d.type)}
-                        className="w-16 h-16 rounded-xl bg-black/40 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-900/40 hover:scale-110 transition-all flex flex-col items-center justify-center gap-1 group"
-                    >
-                        <span className="text-xl font-bold text-cyan-100 group-hover:text-white">{d.type}</span>
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
-                    </button>
-                ))}
-            </div>
-
-            <div className="bg-black/50 rounded-xl p-4 min-h-[100px] mb-8 border border-white/10">
-                <div className="text-sm text-gray-400 mb-2">Selected Dice ({selection.length}):</div>
-                <div className="flex flex-wrap gap-2">
-                    {selection.length === 0 && <span className="text-gray-600 italic">No dice selected...</span>}
-                    {selection.map((die, idx) => (
-                        <div key={idx} className="px-3 py-1 bg-cyan-900/50 rounded-full border border-cyan-500/30 flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                            <span className="font-mono text-cyan-300">{die.type}</span>
-                            <button onClick={() => removeDie(idx)} className="hover:text-red-400"><X size={14} /></button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <button 
-                onClick={rollDice}
-                disabled={selection.length === 0}
-                className="w-full py-4 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-black text-xl hover:from-cyan-500 hover:to-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(34,211,238,0.4)]"
-            >
-                ROLL
-            </button>
-        </div>
-      )}
-
-      {/* ROLLING MODE */}
-      {(mode === 'rolling' || mode === 'vanishing') && (
-        <div className="fixed inset-0 w-full h-full">
-            {/* 3D Container - Pointer events none lets clicks pass through */}
-            <div ref={mountRef} className="absolute inset-0 z-0 pointer-events-none" />
-            
-            {/* Results Sidebar - Pointer events AUTO so you can interact with it if needed */}
-            <div className={`absolute right-0 top-20 pointer-events-auto bg-black/80 backdrop-blur-md p-6 rounded-l-2xl border-l-2 border-y-2 border-cyan-500 transform transition-all duration-500 min-w-[200px] ${mode === 'vanishing' ? 'opacity-0 translate-x-full' : 'animate-[slideInRight_0.5s_ease-out]'}`}>
-                <div className="flex justify-between items-center mb-4 border-b border-cyan-500/30 pb-2">
-                    <h3 className="text-cyan-400 font-bold">RESULTS</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20}/></button>
-                </div>
-                
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                    {results.map((res, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-lg animate-in fade-in slide-in-from-right-10 duration-300" style={{animationDelay: `${idx * 100}ms`}}>
-                            <span className="text-gray-400 uppercase text-sm">{res.type}</span>
-                            <span className="font-bold font-mono text-2xl" style={{ color: res.config.color }}>{res.value}</span>
-                        </div>
-                    ))}
-                </div>
-                
-                <div className="mt-6 pt-4 border-t border-cyan-500/50">
-                    <div className="flex justify-between items-center">
-                        <span className="text-purple-300 font-bold">TOTAL</span>
-                        <span className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">{total}</span>
+            {/* RESULTS DISPLAY */}
+            {results && (
+                <div className="bg-black/80 backdrop-blur-xl border-2 border-cyan-500 p-6 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.6)] flex flex-col items-center gap-2 min-w-[300px]">
+                    <h3 className="text-cyan-400 font-bold tracking-widest text-sm">TOTAL RESULT</h3>
+                    <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300 drop-shadow-sm">
+                        {total}
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
+                        {results.map((r, i) => (
+                            <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm text-cyan-200 font-mono">
+                                {r.type}: {r.value}
+                            </span>
+                        ))}
                     </div>
                 </div>
+            )}
+
+            {/* SELECTION BAR */}
+            <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-4 max-w-3xl mx-4">
+                
+                {/* Header & Close */}
+                <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                         <Dices className="text-cyan-400 w-5 h-5" />
+                         <span className="font-bold text-white">COSMIC ROLLER</span>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle /></button>
+                </div>
+
+                {/* Dice Buttons */}
+                <div className="flex flex-wrap justify-center gap-3">
+                    {diceOptions.map((opt) => (
+                        <button
+                            key={opt.type}
+                            onClick={() => addToPool(opt.type)}
+                            disabled={!isLoaded || rolling}
+                            className="group relative w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-900/50 transition-all active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center gap-1"
+                        >
+                            <span className="text-xs font-bold text-cyan-100">{opt.label}</span>
+                            {/* Simple icon representation */}
+                            <div className={`w-2 h-2 rounded-full ${pool.filter(p => p === opt.type).length > 0 ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-gray-600'}`}></div>
+                            
+                            {/* Badge count */}
+                            {pool.filter(p => p === opt.type).length > 0 && (
+                                <div className="absolute -top-2 -right-2 w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/20">
+                                    {pool.filter(p => p === opt.type).length}
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Action Bar */}
+                <div className="flex gap-3">
+                    <button 
+                        onClick={clearPool}
+                        disabled={pool.length === 0 || rolling}
+                        className="px-4 py-3 rounded-xl bg-red-900/30 border border-red-500/30 text-red-300 hover:bg-red-900/50 transition-colors disabled:opacity-30"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </button>
+                    
+                    <button
+                        onClick={rollDice}
+                        disabled={pool.length === 0 || rolling || !isLoaded}
+                        className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-bold text-lg hover:from-cyan-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        {rolling ? (
+                            <span className="animate-pulse">ROLLING...</span>
+                        ) : (
+                            <>
+                                ROLL DICE <Dices className="w-5 h-5" />
+                            </>
+                        )}
+                    </button>
+                </div>
+                
+                {!isLoaded && (
+                    <div className="text-center text-xs text-cyan-500 animate-pulse">
+                        Initializing Physics Engine...
+                    </div>
+                )}
             </div>
-            <style>{`@keyframes slideInRight { from { transform: translate(100%, 0); } to { transform: translate(0, 0); } }`}</style>
         </div>
-      )}
     </div>
   );
 };
