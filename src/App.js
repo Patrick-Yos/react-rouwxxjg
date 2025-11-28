@@ -99,32 +99,42 @@ const CosmicSyndicate = () => {
     let scene, camera, renderer, controls, animationId;
     let planets = [];
     let raycaster, mouse;
+    let targetCameraPos = null; // For zooming
+    let targetLookAt = null;
 
-    // Reset pause state when opening
     setIsPaused(false);
     isPausedRef.current = false;
 
-    // Load THREE.js + OrbitControls from CDN
-    const loadThreeJS = async () => {
-      if (window.THREE && window.THREE.OrbitControls) {
-        initSolarSystem();
-        return;
-      }
+    // Helper: Create Text Sprite
+    const createLabel = (text) => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 256; canvas.height = 64;
+        context.font = 'Bold 24px Arial';
+        context.fillStyle = 'rgba(255,255,255,1)';
+        context.strokeStyle = 'rgba(0,0,0,0.8)';
+        context.lineWidth = 4;
+        context.textAlign = 'center';
+        context.strokeText(text, 128, 32);
+        context.fillText(text, 128, 32);
+        
+        const texture = new window.THREE.CanvasTexture(canvas);
+        const material = new window.THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new window.THREE.Sprite(material);
+        sprite.scale.set(20, 5, 1);
+        return sprite;
+    };
 
-      // 1. Load Main Three.js
+    const loadThreeJS = async () => {
+      if (window.THREE && window.THREE.OrbitControls) { initSolarSystem(); return; }
       const scriptMain = document.createElement('script');
-      scriptMain.src =
-        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      scriptMain.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
       scriptMain.async = true;
       scriptMain.onload = () => {
-        // 2. Load OrbitControls
         const scriptControls = document.createElement('script');
-        scriptControls.src =
-          'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+        scriptControls.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
         scriptControls.async = true;
-        scriptControls.onload = () => {
-          initSolarSystem();
-        };
+        scriptControls.onload = () => { initSolarSystem(); };
         document.head.appendChild(scriptControls);
       };
       document.head.appendChild(scriptMain);
@@ -134,226 +144,124 @@ const CosmicSyndicate = () => {
       const THREE = window.THREE;
       const container = mountRef.current;
 
-      // SCENE
       scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
-      // CAMERA
-      camera = new THREE.PerspectiveCamera(
-        60,
-        container.clientWidth / container.clientHeight,
-        0.1,
-        2000
-      );
+      camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
       camera.position.set(0, 150, 300);
 
-      // RENDERER
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.shadowMap.enabled = true;
       container.appendChild(renderer.domElement);
 
-      // CONTROLS
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
       controls.enablePan = false;
-      controls.minDistance = 50;
+      controls.minDistance = 20;
       controls.maxDistance = 800;
 
-      // LIGHTING
       const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
       scene.add(ambientLight);
-
       const sunLight = new THREE.PointLight(0xffaa00, 1.5, 1000);
       sunLight.position.set(0, 0, 0);
       scene.add(sunLight);
 
-      // --- OBJECTS ---
-
-      // 1. THE RED STAR (Sun)
+      // SUN
       const sunGeo = new THREE.SphereGeometry(15, 64, 64);
       const sunMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
       const sunMesh = new THREE.Mesh(sunGeo, sunMat);
       scene.add(sunMesh);
 
-      // Animated Sun Glow
+      // Sun Glow
       const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const context = canvas.getContext('2d');
-      const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+      canvas.width = 128; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
       gradient.addColorStop(0, 'rgba(255, 100, 0, 1)');
       gradient.addColorStop(0.2, 'rgba(255, 50, 0, 0.6)');
       gradient.addColorStop(0.5, 'rgba(100, 20, 0, 0.2)');
       gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, 128, 128);
-
-      const glowTexture = new THREE.CanvasTexture(canvas);
-      const glowMat = new THREE.SpriteMaterial({
-        map: glowTexture,
-        color: 0xff5500,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-      });
+      ctx.fillStyle = gradient; ctx.fillRect(0, 0, 128, 128);
+      const glowMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), color: 0xff5500, transparent: true, blending: THREE.AdditiveBlending });
       const sunGlow = new THREE.Sprite(glowMat);
       sunGlow.scale.set(80, 80, 1);
       sunMesh.add(sunGlow);
 
-      // 2. PLANETS
+      // PLANETS DATA
       const planetsData = [
-        {
-          name: 'Sulfur',
-          distance: 60,
-          size: 4,
-          speed: 0.005,
-          color: 0xd97706,
-          desc: 'Desert world - rocky terrain, sulfur lakes, extreme heat.',
-          mat: { roughness: 0.9, metalness: 0.1 },
-        },
-        {
-          name: 'Rodina',
-          distance: 90,
-          size: 6,
-          speed: 0.004,
-          color: 0x3b82f6,
-          desc: 'Earthy paradise.',
-          mat: { roughness: 0.4, metalness: 0.1, emissive: 0x001133 },
-        },
-        {
-          name: 'Cupie',
-          distance: 130,
-          size: 7,
-          speed: 0.003,
-          color: 0xa855f7,
-          desc: 'Cracked heart planet. Green forests meet purple wastelands.',
-          hasRing: true,
-          mat: { roughness: 0.6 },
-        },
-        {
-          name: 'Apatia',
-          distance: 170,
-          size: 5.5,
-          speed: 0.0025,
-          color: 0x06b6d4,
-          desc: 'Earth with a twist. Time flows differently here.',
-          mat: { roughness: 0.3, metalness: 0.2 },
-        },
-        {
-          name: 'The March',
-          distance: 210,
-          size: 6.5,
-          speed: 0.002,
-          color: 0x6b7280,
-          desc: 'Abandoned military world. Ruins and artifcats.',
-          mat: { roughness: 1.0, metalness: 0.5 },
-        },
-        {
-          name: 'The Wilds',
-          distance: 250,
-          size: 8,
-          speed: 0.0015,
-          color: 0x10b981,
-          desc: 'Amazon forest planet. Endless bioluminescent jungle.',
-          mat: { roughness: 0.8, emissive: 0x002200 },
-        },
-        {
-          name: 'Phantoma',
-          distance: 300,
-          size: 7,
-          speed: 0.001,
-          color: 0xffffff,
-          desc: 'Ghost planet with military moon Neinich.',
-          hasMoon: true,
-          isGhost: true,
-        },
+        { name: 'Sulfur', distance: 60, size: 4, speed: 0.005, color: 0xd97706, desc: 'Desert world - rocky terrain, sulfur lakes.', mat: { roughness: 0.9, metalness: 0.1 } },
+        { name: 'Rodina', distance: 90, size: 6, speed: 0.004, color: 0x3b82f6, desc: 'Earthy paradise.', mat: { roughness: 0.4, metalness: 0.1, emissive: 0x001133 } },
+        { name: 'Cupie', distance: 130, size: 7, speed: 0.003, color: 0xa855f7, desc: 'Two merging planets with a chaotic asteroid field.', type: 'dual-merge' },
+        { name: 'Apatia', distance: 170, size: 5.5, speed: 0.0025, color: 0x06b6d4, desc: 'Earth with a twist.', mat: { roughness: 0.3, metalness: 0.2 } },
+        { name: 'The March', distance: 210, size: 6.5, speed: 0.002, color: 0x6b7280, desc: 'Abandoned military world.', mat: { roughness: 1.0, metalness: 0.5 } },
+        { name: 'The Wilds', distance: 250, size: 8, speed: 0.0015, color: 0x10b981, desc: 'Amazon forest planet.', mat: { roughness: 0.8, emissive: 0x002200 } },
+        { name: 'Phantoma', distance: 300, size: 7, speed: 0.001, color: 0xffffff, desc: 'Ghost planet with moon.', hasMoon: true, isGhost: true },
       ];
 
-      planetsData.forEach((data, index) => {
+      planetsData.forEach((data) => {
         // Orbit Line
-        const orbitGeo = new THREE.RingGeometry(
-          data.distance - 0.3,
-          data.distance + 0.3,
-          128
-        );
-        const orbitMat = new THREE.MeshBasicMaterial({
-          color: 0x666666,
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0.3,
-        });
+        const orbitGeo = new THREE.RingGeometry(data.distance - 0.3, data.distance + 0.3, 128);
+        const orbitMat = new THREE.MeshBasicMaterial({ color: 0x666666, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
         const orbit = new THREE.Mesh(orbitGeo, orbitMat);
         orbit.rotation.x = Math.PI / 2;
         scene.add(orbit);
 
-        // Planet Mesh
-        const geometry = new THREE.SphereGeometry(data.size, 32, 32);
-        let material;
+        // Planet Group/Mesh
+        let mainMesh;
+        if (data.type === 'dual-merge') {
+            mainMesh = new THREE.Group();
+            const geoA = new THREE.SphereGeometry(data.size * 0.6, 32, 32);
+            const matA = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.7 });
+            const planetA = new THREE.Mesh(geoA, matA); planetA.position.set(-2.5, 0, 0);
+            const geoB = new THREE.SphereGeometry(data.size * 0.7, 32, 32);
+            const matB = new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.6 });
+            const planetB = new THREE.Mesh(geoB, matB); planetB.position.set(2.5, 0, 0);
+            mainMesh.add(planetA); mainMesh.add(planetB);
 
-        if (data.isGhost) {
-          material = new THREE.MeshPhysicalMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.3,
-            transmission: 0.6,
-            roughness: 0.2,
-            metalness: 0.1,
-          });
+            // Asteroids
+            const count = 600; const pos = new Float32Array(count*3);
+            for(let i=0; i<count; i++) {
+                const a = Math.random()*Math.PI*2; const r = 6+Math.random()*4;
+                pos[i*3] = Math.cos(a)*r; pos[i*3+1] = (Math.random()-0.5)*1.5; pos[i*3+2] = Math.sin(a)*r;
+            }
+            const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const pMat = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.3 });
+            const belt = new THREE.Points(pGeo, pMat); belt.rotation.x = Math.PI/6; belt.rotation.y = Math.PI/6;
+            mainMesh.add(belt);
+            mainMesh.userData = { ...data };
         } else {
-          material = new THREE.MeshStandardMaterial({
-            color: data.color,
-            ...data.mat,
-          });
+            const geo = new THREE.SphereGeometry(data.size, 32, 32);
+            let mat;
+            if (data.isGhost) mat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, transmission: 0.6, roughness: 0.2, metalness: 0.1 });
+            else mat = new THREE.MeshStandardMaterial({ color: data.color, ...data.mat });
+            mainMesh = new THREE.Mesh(geo, mat);
+            mainMesh.userData = { ...data };
         }
+        scene.add(mainMesh);
 
-        const planet = new THREE.Mesh(geometry, material);
-        planet.userData = { ...data, index };
-        scene.add(planet);
+        // Add Label
+        const label = createLabel(data.name);
+        label.position.set(0, data.size + 3, 0); // Position above planet
+        mainMesh.add(label);
 
-        // Ring for Cupi
-        if (data.hasRing) {
-          const ringGeo = new THREE.RingGeometry(
-            data.size * 1.4,
-            data.size * 2.2,
-            64
-          );
-          const ringMat = new THREE.MeshStandardMaterial({
-            color: 0xcc88ff,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.7,
-          });
-          const ring = new THREE.Mesh(ringGeo, ringMat);
-          ring.rotation.x = Math.PI / 2;
-          planet.add(ring);
-        }
-
-        // Moon for Phantoma
+        // Moon
+        let moonPivot = null;
         if (data.hasMoon) {
-          const moonPivot = new THREE.Object3D();
-          planet.add(moonPivot);
-          const moonGeo = new THREE.SphereGeometry(data.size * 0.35, 16, 16);
-          const moonMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
-          const moon = new THREE.Mesh(moonGeo, moonMat);
+          moonPivot = new THREE.Object3D();
+          mainMesh.add(moonPivot);
+          const moon = new THREE.Mesh(new THREE.SphereGeometry(data.size * 0.35, 16, 16), new THREE.MeshStandardMaterial({ color: 0x888888 }));
           moon.position.set(12, 0, 0);
-          moon.userData = { name: 'Neiniche', desc: 'Military Moon Fortress' };
           moonPivot.add(moon);
-          data.moonPivot = moonPivot;
         }
 
         const angle = Math.random() * Math.PI * 2;
-        planets.push({
-          mesh: planet,
-          distance: data.distance,
-          speed: data.speed,
-          angle: angle,
-          moonPivot: data.moonPivot,
-        });
+        planets.push({ mesh: mainMesh, distance: data.distance, speed: data.speed, angle: angle, moonPivot: moonPivot, type: data.type });
       });
 
-      // RAYCASTER
+      // RAYCASTER & ZOOM
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
 
@@ -363,16 +271,29 @@ const CosmicSyndicate = () => {
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(scene.children, true);
-        const hit = intersects.find(
-          (i) =>
-            i.object.userData &&
-            (i.object.userData.name || i.object.userData.desc)
-        );
+        const hit = intersects.find(i => i.object.userData && (i.object.userData.name || i.object.userData.desc));
+        
         if (hit) {
-          const planetData = hit.object.userData.name
-            ? hit.object.userData
-            : hit.object.parent.userData;
+          const planetData = hit.object.parent?.userData?.name ? hit.object.parent.userData : hit.object.userData;
           setSelectedPlanet(planetData);
+          
+          // --- ZOOM LOGIC ---
+          // 1. Pause rotation so planet stays still for reading
+          setIsPaused(true);
+          isPausedRef.current = true;
+
+          // 2. Calculate target position (Planet Position + Offset)
+          const planetPos = new THREE.Vector3();
+          // Use parent if it's a child mesh (like dual planet parts)
+          const targetObj = hit.object.parent?.type === 'Group' ? hit.object.parent : hit.object;
+          targetObj.getWorldPosition(planetPos);
+
+          // New Camera Position: Planet Pos + Offset
+          targetCameraPos = planetPos.clone().add(new THREE.Vector3(15, 10, 20)); // Closer zoom
+          targetLookAt = planetPos.clone();
+          
+          // Update orbit controls target to pivot around this planet
+          controls.target.copy(targetLookAt);
         }
       };
 
@@ -381,30 +302,30 @@ const CosmicSyndicate = () => {
       // ANIMATION
       const animate = () => {
         animationId = requestAnimationFrame(animate);
-
         controls.update();
 
-        // Always animate Sun Glow
+        // Handle Zoom Animation (Lerp)
+        if (targetCameraPos && targetLookAt) {
+            camera.position.lerp(targetCameraPos, 0.05);
+            // controls.target is updated instantly on click, but we ensure camera looks at it
+            camera.lookAt(controls.target); 
+        }
+
         const time = Date.now() * 0.001;
         sunGlow.scale.set(80 + Math.sin(time) * 5, 80 + Math.sin(time) * 5, 1);
 
-        // ONLY ANIMATE PLANETS IF NOT PAUSED
         if (!isPausedRef.current) {
-          planets.forEach((p) => {
+          planets.forEach(p => {
             p.angle += p.speed;
             p.mesh.position.x = Math.cos(p.angle) * p.distance;
             p.mesh.position.z = Math.sin(p.angle) * p.distance;
             p.mesh.rotation.y += 0.005;
-
-            if (p.moonPivot) {
-              p.moonPivot.rotation.y += 0.03;
-            }
+            if (p.type === 'dual-merge') p.mesh.rotation.z += 0.002;
+            if (p.moonPivot) p.moonPivot.rotation.y += 0.03;
           });
         }
-
         renderer.render(scene, camera);
       };
-
       animate();
 
       const handleResize = () => {
@@ -418,9 +339,7 @@ const CosmicSyndicate = () => {
       return () => {
         cancelAnimationFrame(animationId);
         window.removeEventListener('resize', handleResize);
-        if (container) {
-          container.innerHTML = '';
-        }
+        if (container) container.innerHTML = '';
         renderer.dispose();
       };
     };
