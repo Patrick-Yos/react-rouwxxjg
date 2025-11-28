@@ -349,245 +349,67 @@ const ArcadeOverlay = ({ onClose }) => {
   );
 };
 //--Dice COMPONENT---
-// --- IMPORT THE LIBRARY DIRECTLY ---
-// Make sure to run: npm install @3d-dice/dice-box
-const DiceRoller = ({ onClose }) => {
-  const [status, setStatus] = useState('loading'); // loading, ready, error
-  const [pool, setPool] = useState([]); 
-  const [rolling, setRolling] = useState(false);
-  const [results, setResults] = useState(null);
-  const [total, setTotal] = useState(0);
-  const containerId = 'dice-box-canvas';
-  
-  // We use a ref to keep the Box instance alive across renders
-  const boxRef = new DiceBox("#dice-box", {
-  assetPath: "/assets/dice-box", // required});
+import "./styles.css";
+import DiceBox from "@3d-dice/dice-box";
+import DisplayResults from "@3d-dice/dice-ui/src/displayResults";
+import AdvancedRoller from "@3d-dice/dice-ui/src/advancedRoller";
+import BoxControls from "@3d-dice/dice-ui/src/boxControls";
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const initDiceBox = async () => {
-      if (boxRef.current) return; // Prevent double init
+let Box = new DiceBox("#dice-box", {
+  assetPath: "/public/assets/dice-box/",
+  theme: "default",
+  offscreen: true,
+  scale: 6
 });
-      // 1. Create the Box Instance using your working logic
-      const Box = new DiceBox({
-        container: "#" + containerId,
-        // CRITICAL FOR VERCEL: We use the CDN for assets (wasm/workers) 
-        // so you don't have to manually copy files to your public folder.
-        assetPath: "https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/assets/",
-        theme: "default",
-        themeColor: "#06b6d4", // Cyan to match theme
-        offscreen: true, // Use worker for performance
-        scale: 6,
-        gravity: 3,
-        mass: 5,
-        friction: 0.8
-      });
 
-      try {
-        // 2. Initialize
-        await Box.init();
-        
-        if (isMounted) {
-          boxRef.current = Box;
-          setStatus('ready');
+// document.addEventListener("DOMContentLoaded", async () => {
+Box.init().then(async (world) => {
+  // console.log("Box is ready");
 
-          // 3. Set up the event listener for results
-          Box.onRollComplete = (rollResults) => {
-            // Calculate totals for our Custom UI
-            let sum = 0;
-            const resArray = [];
-            
-            // Handle different result formats (single vs multiple)
-            const rolls = Array.isArray(rollResults) ? rollResults : [rollResults];
-            
-            rolls.forEach(r => {
-               // Depending on version, result might be r.value or r.total
-               const val = r.value || r.total || 0; 
-               sum += val;
-               // Map type (d20, d6) and value
-               // Some versions return 'sides' or 'type'
-               resArray.push({ type: r.type || `d${r.sides}`, value: val });
-            });
+  const Controls = new BoxControls({
+    themes: ["default", "rust", "diceOfRolling", "gemstone"],
+    themeColor: world.config.themeColor,
+    onUpdate: (updates) => {
+      Box.updateConfig(updates);
+    }
+  });
+  Controls.themeSelect.setValue(world.config.theme);
 
-            setResults(resArray);
-            setTotal(sum);
-            
-            // Auto Clear logic to keep the board clean
-            setTimeout(() => {
-              if (boxRef.current) boxRef.current.clear();
-              setResults(null);
-              setTotal(0);
-              setRolling(false);
-            }, 6000);
-          };
-        }
-      } catch (e) {
-        console.error("Dice Init Error:", e);
-        if (isMounted) setStatus('error');
-      }
-    };
-
-    // Small timeout to ensure DOM is ready
-    setTimeout(initDiceBox, 100);
-
-    return () => {
-      isMounted = false;
-      // If the library had a destroy method, we'd call it here
-    };
-  }, []);
-
-  const addToPool = (type) => {
-    if (rolling) return;
-    setPool([...pool, type]);
-  };
-
-  const clearPool = () => {
-    if (rolling) return;
-    setPool([]);
-  };
-
-  const rollDice = async () => {
-    if (!boxRef.current || pool.length === 0 || rolling) return;
-    
-    setRolling(true);
-    setResults(null);
-    setTotal(0);
-
-    // Convert our pool array ['d20', 'd6'] into notation ["1d20", "1d6"]
-    // The library prefers notation arrays
-    const notation = pool.map(die => {
-        if (die === 'd1000') return '3d10'; // Visual hack for d1000
-        return '1' + die;
-    });
-
-    try {
-        await boxRef.current.roll(notation);
-    } catch (e) {
-        console.error("Roll Error", e);
-        setRolling(false);
+  Box.onThemeConfigLoaded = (themeData) => {
+    if (themeData.themeColor) {
+      Controls.themeColorPicker.setValue(themeData.themeColor);
     }
   };
 
-  const diceOptions = [
-    { type: 'd4', label: 'D4' },
-    { type: 'd6', label: 'D6' },
-    { type: 'd8', label: 'D8' },
-    { type: 'd10', label: 'D10' },
-    { type: 'd12', label: 'D12' },
-    { type: 'd20', label: 'D20' },
-    { type: 'd100', label: 'D100' },
-    // { type: 'd1000', label: 'D1K' }, // Removed D1K for stability with standard library
-  ];
+  // create display overlay
+  const Display = new DisplayResults("#dice-box");
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center pointer-events-none">
-        
-        {/* CLICK TO CLOSE */}
-        <div className="absolute inset-0 z-0 pointer-events-auto" onClick={(e) => {
-            if (e.target === e.currentTarget && !rolling) onClose();
-        }}></div>
+  // // create Roller Input
+  const Roller = new AdvancedRoller({
+    target: "#dice-box",
+    onSubmit: (notation) => Box.roll(notation),
+    onClear: () => {
+      Box.clear();
+      Display.clear();
+    },
+    onReroll: (rolls) => {
+      // loop through parsed roll notations and send them to the Box
+      rolls.forEach((roll) => Box.add(roll, roll.groupId));
+    },
+    onResults: (results) => {
+      console.log(results);
+      Display.showResults(results);
+    }
+  });
 
-        {/* 3D CANVAS CONTAINER - THIS IS WHERE THE DICE APPEAR */}
-        <div 
-            id={containerId} 
-            className="absolute inset-0 z-10 pointer-events-none"
-            style={{ width: '100%', height: '100%' }}
-        />
+  // pass dice rolls to Advanced Roller to handle
+  Box.onRollComplete = (results) => {
+    Roller.handleResults(results);
+  };
+  Box.roll(["4d20", "4d12", "4d10", "4d8", "4d6", "4d4"]);
+});
+// });
 
-        {/* CONTROLS */}
-        <div className="relative z-20 mb-8 pointer-events-auto flex flex-col items-center gap-4 animate-in slide-in-from-bottom-10 duration-500">
-            
-            {/* RESULTS OVERLAY */}
-            {results && (
-                <div className="bg-black/80 backdrop-blur-xl border-2 border-cyan-500 p-6 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.6)] flex flex-col items-center gap-2 min-w-[300px] animate-in zoom-in duration-300">
-                    <h3 className="text-cyan-400 font-bold tracking-widest text-sm">TOTAL</h3>
-                    <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300 drop-shadow-sm">
-                        {total}
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
-                        {results.map((r, i) => (
-                            <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm text-cyan-200 font-mono">
-                                {r.value}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* CONTROL PANEL */}
-            <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-4 max-w-3xl mx-4">
-                
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                    <div className="flex items-center gap-2">
-                         <Dices className="text-cyan-400 w-5 h-5" />
-                         <span className="font-bold text-white">COSMIC ROLLER</span>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle /></button>
-                </div>
-
-                {/* DICE BUTTONS */}
-                <div className="flex flex-wrap justify-center gap-3">
-                    {diceOptions.map((opt) => (
-                        <button
-                            key={opt.type}
-                            onClick={() => addToPool(opt.type)}
-                            disabled={status !== 'ready' || rolling}
-                            className="group relative w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-900/50 transition-all active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center gap-1"
-                        >
-                            <span className="text-xs font-bold text-cyan-100">{opt.label}</span>
-                            <div className={`w-2 h-2 rounded-full ${pool.filter(p => p === opt.type).length > 0 ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-gray-600'}`}></div>
-                            
-                            {pool.filter(p => p === opt.type).length > 0 && (
-                                <div className="absolute -top-2 -right-2 w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/20">
-                                    {pool.filter(p => p === opt.type).length}
-                                </div>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* ACTION BUTTONS */}
-                <div className="flex gap-3">
-                    <button 
-                        onClick={clearPool}
-                        disabled={pool.length === 0 || rolling}
-                        className="px-4 py-3 rounded-xl bg-red-900/30 border border-red-500/30 text-red-300 hover:bg-red-900/50 transition-colors disabled:opacity-30"
-                    >
-                        <Trash2 className="w-5 h-5" />
-                    </button>
-                    
-                    <button
-                        onClick={rollDice}
-                        disabled={pool.length === 0 || rolling || status !== 'ready'}
-                        className="flex-1 py-3 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-bold text-lg hover:from-cyan-500 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {rolling ? (
-                            <span className="animate-pulse">ROLLING...</span>
-                        ) : (
-                            <>
-                                ROLL DICE <Dices className="w-5 h-5" />
-                            </>
-                        )}
-                    </button>
-                </div>
-                
-                {status === 'loading' && (
-                    <div className="text-center text-xs text-yellow-500 animate-pulse">
-                        <span className="inline-block animate-spin mr-2">⚙️</span>
-                        Initializing Physics Engine...
-                    </div>
-                )}
-                {status === 'error' && (
-                    <div className="text-center text-xs text-red-400">
-                        Error loading physics. Please check your internet connection.
-                    </div>
-                )}
-            </div>
-        </div>
-    </div>
-  );
-};
 // --- DICE COMPONENT ---
 
 // --- MAIN COMPONENT ---
