@@ -28,12 +28,17 @@ module.exports = async (req, res) => {
         });
       }
 
-      await sql`
+      // Insert and RETURN the auto-generated ID
+      const result = await sql`
         INSERT INTO reviews (name, rating, comment, date)
         VALUES (${name}, ${rating}, ${comment}, ${date})
+        RETURNING id
       `;
       
-      return res.json({ success: true });
+      return res.json({ 
+        success: true, 
+        id: result.rows[0].id // Send the DB-generated ID back to frontend
+      });
     }
   } catch (error) {
     console.error('API Error:', error);
