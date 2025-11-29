@@ -370,7 +370,7 @@ const DiceRoller = ({ onClose }) => {
 
       // Initialize from CDN
       const Box = new DiceBox({
-        id: containerId,
+        id: '#' + containerId,
         assetPath: '/assets/', 
         origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/',
         theme: 'default',
