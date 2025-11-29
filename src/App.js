@@ -32,8 +32,8 @@ import {
   Ghost,    // Added for Game
   Brain,    // Added for Game
   Timer,    // Added for Game
-  XCircle, // Added for 
-  s, // Added for 
+  XCircle, // Added for dice
+  Dices, // Added for dice
 } from 'lucide-react';
 
 // --- NEW COMPONENT: WARP SPEED BACKGROUND ---
