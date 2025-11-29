@@ -37,6 +37,37 @@ import {
   Dices,
 } from 'lucide-react';
 
+// --- Loading reviews--
+const loadReviews = async () => {
+  try {
+    const response = await fetch('/api/reviews');
+    if (!response.ok) throw new Error('Failed');
+    return await response.json();
+  } catch (error) {
+    console.error('Error loading reviews:', error);
+    return [{ id: 1, name: 'Gloria', rating: 4, comment: 'I guess they are okay', date: 'Cosmic Year 2024.7' }];
+  }
+};
+// -- save saving reviews
+const saveReview = async (review) => {
+  try {
+    const response = await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(review),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      alert(error.error || 'Failed to save review');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    alert('Network error. Please try again.');
+    return false;
+  }
+};
 // --- NEW COMPONENT: WARP SPEED BACKGROUND ---
 const WarpSpeedBackground = () => {
   const canvasRef = useRef(null);
@@ -682,15 +713,10 @@ const CosmicSyndicate = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [reviews, setReviews] = useState([
-    {
-      id: 1,
-      name: 'Gloria',
-      rating: 4,
-      comment: 'I guess they are okay',
-      date: 'Cosmic Year 2024.7',
-    },
-  ]);
+  const [reviews, setReviews] = useState([]);
+  useEffect(() => {
+    loadReviews().then(setReviews);
+    }, []);
   const [newReview, setNewReview] = useState({
     name: '',
     rating: 5,
@@ -1182,19 +1208,24 @@ const CosmicSyndicate = () => {
     );
   };
 
-  const submitReview = (e) => {
-    e.preventDefault();
-    if (newReview.name && newReview.comment) {
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-      setReviews((prev) => [
-        ...prev,
-        { ...newReview, id: Date.now(), date: `Cosmic Year ${formattedDate}` },
-      ]);
+const submitReview = async (e) => {
+  e.preventDefault();
+  if (newReview.name && newReview.comment) {
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    
+    const reviewToSave = {
+      ...newReview,
+      date: `Cosmic Year ${formattedDate}`
+    };
+    
+    const success = await saveReview(reviewToSave);
+    if (success) {
+      setReviews((prev) => [...prev, { ...reviewToSave, id: Date.now() }]);
       setNewReview({ name: '', rating: 5, comment: '' });
       setTimeout(
         () =>
@@ -1204,8 +1235,8 @@ const CosmicSyndicate = () => {
         100
       );
     }
-  };
-
+  }
+};
   const handleCheckout = () => {
     if (cart.length === 0) return;
     document.getElementById('cart-drawer')?.classList.add('translate-x-full');
