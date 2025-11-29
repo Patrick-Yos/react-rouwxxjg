@@ -482,6 +482,14 @@ const DiceRoller = ({ onClose }) => {
     }
   };
 
+    const handleClose = () => {
+    if (!rolling) {
+      handleClear(); // Clear the board first
+      onClose();     // Then close the widget
+    }
+  };
+
+
   const handleRoll = () => {
     if (!diceBoxRef.current || pool.length === 0 || rolling) return;
 
@@ -609,7 +617,7 @@ const DiceRoller = ({ onClose }) => {
                      </div>
                    )}
                 </div>
-                <button onClick={onClose} className="text-gray-400 hover:text-white"><XCircle /></button>
+                <button onClick={handleClose} className="text-gray-400 hover:text-white"><XCircle /></button>
             </div>
 
             {/* BUTTONS */}
