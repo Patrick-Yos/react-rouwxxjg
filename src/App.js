@@ -361,7 +361,7 @@ const DiceRoller = ({ onClose }) => {
   const [total, setTotal] = useState(0);
   
   // FIXED: We use a standard ID string for the HTML element
-  const containerId = 'dice-box-canvas';
+  const containerId = '#dice-box';
   const boxRef = useRef(null);
   const initialized = useRef(false); // Ref to prevent double-init
 
@@ -373,7 +373,7 @@ const DiceRoller = ({ onClose }) => {
 
       // FIXED: Added '#' to the id so the library finds the <div>
       const Box = new DiceBox({
-        id: '#' + containerId, 
+        id:+ containerId, 
         assetPath: '/assets/',
         origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/',
         theme: 'default',
