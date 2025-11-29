@@ -358,7 +358,7 @@ const DiceRoller = ({ onClose }) => {
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState(null);
   const [total, setTotal] = useState(0);
-  const containerId = 'dice-box-canvas';
+  const containerId = '#dice-box';
   
   const boxRef = useRef(null);
 
@@ -370,14 +370,15 @@ const DiceRoller = ({ onClose }) => {
 
       // Initialize from CDN
       const Box = new DiceBox({
-        id: '#' + containerId,
-        assetPath: '/assets/', 
+        id: containerId,
+        assetPath: 'assets/',
         origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.3/dist/',
         theme: 'default',
-        themeColor: '#22d3ee', // Cyan-400
         scale: 6,
-        offscreen: true,
+        themeColor: '#0A0A12',
+        debug: false, // Turn off debug to see real dice
       });
+
 
       try {
         await Box.init();
