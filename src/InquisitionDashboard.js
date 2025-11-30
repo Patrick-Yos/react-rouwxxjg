@@ -25,7 +25,7 @@ import {
   Globe,
   Wifi,
   Sword,
-  Radioactive,
+  Radiation,
   Biohazard,
   Sparkles,
   Bug,
