@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 
 // --- Loading reviews--
+// Load reviews with the average:
+
 const loadReviews = async () => {
   try {
     const response = await fetch('/api/reviews');
@@ -721,14 +723,15 @@ const CosmicSyndicate = () => {
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
 const [reviews, setReviews] = useState([]);
+const [averageRating, setAverageRating] = useState(0); // Add this line
+
 useEffect(() => {
   loadReviews().then(({ reviews, averageRating }) => {
     setReviews(reviews);
     setAverageRating(parseFloat(averageRating));
   });
 }, []);
-const [averageRating, setAverageRating] = useState(0); // Add this line
-
+  
   const [newReview, setNewReview] = useState({
     name: '',
     rating: 5,
@@ -1222,18 +1225,18 @@ const [averageRating, setAverageRating] = useState(0); // Add this line
     );
   };
  // For average Reviews  ()
-  const renderStarRating = (rating) => {
-    return [...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        className={`w-5 h-5 ${
-          i < Math.round(rating)
-            ? 'text-yellow-400 fill-yellow-400'
-            : 'text-gray-600'
-        }`}
-      />
-    ));
-  };
+const renderStarRating = (rating) => {
+  return [...Array(5)].map((_, i) => (
+    <Star
+      key={i}
+      className={`w-5 h-5 ${
+        i < Math.round(rating)
+          ? 'text-yellow-400 fill-yellow-400'
+          : 'text-gray-600'
+      }`}
+    />
+  ));
+};
 const submitReview = async (e) => {
   e.preventDefault();
   if (!newReview.name || !newReview.comment) return;
@@ -3115,20 +3118,20 @@ const submitReview = async (e) => {
             <p className="text-xl text-purple-200 italic">
               What the universe says about us
             </p>
-      {/* Average */}
-      {reviews.length > 0 && (
-        <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-br from-purple-900/60 to-pink-900/60 rounded-xl border-2 border-purple-400/50 backdrop-blur-sm">
-          <span className="text-3xl font-bold text-white">
-            {averageRating.toFixed(1)}
-          </span>
-          <div className="flex gap-1">
-            {renderStarRating(averageRating)}
-          </div>
-          <span className="text-purple-200">
-            ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
-          </span>
-        </div>
-      )}
+       {/* Average section  */}
+  {reviews.length > 0 && (
+    <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-br from-purple-900/60 to-pink-900/60 rounded-xl border-2 border-purple-400/50 backdrop-blur-sm">
+      <span className="text-3xl font-bold text-white">
+        {averageRating.toFixed(1)}
+      </span>
+      <div className="flex gap-1">
+        {renderStarRating(averageRating)}
+      </div>
+      <span className="text-purple-200">
+        ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
+      </span>
+    </div>
+  )}
     </div>
     
           <div className="space-y-6">
