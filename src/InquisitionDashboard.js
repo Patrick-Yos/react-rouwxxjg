@@ -5,6 +5,7 @@ import {
   Skull,
   Crosshair,
   Flame,
+  Orbit,
   Book,
   Cpu,
   Scroll,
@@ -25,7 +26,7 @@ import {
   Globe,
   Wifi,
   Sword,
-  Radiation,
+  Radioactive,
   Biohazard,
   Sparkles,
   Bug,
@@ -44,7 +45,6 @@ import {
   Trophy,
   Search,
   Swords,
-  FlameIcon,
   Trophy as TrophyIcon,
 } from 'lucide-react';
 
@@ -338,13 +338,13 @@ const TacticalAuspex = ({ onClose, chaosLevel }) => {
 
     const initBox = async () => {
       try {
-        const box = new DiceBox({
-          id: '#auspex-canvas',
-          assetPath: '/assets/',
+        const box = new DiceBox('#auspex-canvas', {
+          id: '#dice-box',
+          assetPath: 'assets/',
           origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.4/dist/',
-          theme: 'rust',
+          theme: 'default',
           themeColor: '#800000',
-          scale: 6,
+          scale: 25,
         });
         diceBoxRef.current = box;
         await box.init();
@@ -865,7 +865,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
                     className="p-1 bg-red-900 border border-red-500 text-red-200 font-tech text-[8px] hover:bg-red-700 transition-all btn-interactive"
                     title="PURGE"
                   >
-                    <FlameIcon className="w-3 h-3" />
+                    <Flame className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -879,7 +879,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
           <Search className="w-3 h-3" /> Right-click to scan
         </div>
         <div className="flex items-center gap-1">
-          <FlameIcon className="w-3 h-3" /> Click 🔥 to purge
+          <Flame className="w-3 h-3" /> Click 🔥 to purge
         </div>
       </div>
     </div>
@@ -889,7 +889,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
 // --- MACHINE SPIRIT CONSOLE ---
 const MachineSpiritConsole = ({ satisfaction, setSatisfaction }) => {
   const [praying, setPraying] = useState(false);
-  const [favor, setFavor] = useState(0); // Local favor tracker
+  const [favor, setFavor] = useState(0);
 
   const appeaseMachineSpirit = () => {
     if (praying) return;
@@ -1136,6 +1136,7 @@ const InquisitionDashboard = ({ onNavigate }) => {
   const [logs, setLogs] = useState([]);
   const [combatLogs, setCombatLogs] = useState([]);
   const [animeReady, setAnimeReady] = useState(false);
+  const [audioContext, setAudioContext] = useState(null);
 
   const [chaosLevel, setChaosLevel] = useState(15);
   const [selectedWeapon, setSelectedWeapon] = useState(null);
@@ -1148,6 +1149,29 @@ const InquisitionDashboard = ({ onNavigate }) => {
 
   const containerRef = useRef(null);
   const exterminatusInterval = useRef(null);
+
+  // Audio System
+  useEffect(() => {
+    if (!audioMuted) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      setAudioContext(ctx);
+      
+      // Create ambient hum
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(50, ctx.currentTime);
+      gainNode.gain.setValueAtTime(0.005, ctx.currentTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.start();
+      
+      return () => {
+        oscillator.stop();
+        ctx.close();
+      };
+    }
+  }, [audioMuted]);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -1223,7 +1247,7 @@ const InquisitionDashboard = ({ onNavigate }) => {
       const event = events[Math.floor(Math.random() * events.length)];
       addCombatLog(event.msg);
       setChaosLevel((prev) => Math.max(0, Math.min(100, prev + event.level)));
-      Anima.notify(event.msg, event.type);
+      // REMOVED: Anima.notify(event.msg, event.type);
     }, 15000);
 
     return () => {
@@ -1467,7 +1491,7 @@ const InquisitionDashboard = ({ onNavigate }) => {
           </div>
           <div>
             <h1 className="text-3xl md:text-5xl font-gothic font-black tracking-widest leading-none text-transparent bg-clip-text bg-gradient-to-b from-[#e5c079] to-[#8a6e3e] btn-interactive">
-              <DecryptText text="ORDO HERETICUS" chaosLevel={chaosLevel} />
+              <DecryptText text="ORDO XENOS" chaosLevel={chaosLevel} />
             </h1>
             <div className="flex gap-3 text-[10px] font-tech text-red-500 font-bold tracking-[0.2em] uppercase mt-2">
               <ShieldAlert className="w-3 h-3" /> SECTOR CALIXIS // CLEARANCE
