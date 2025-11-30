@@ -1,34 +1,48 @@
-import { Pool } from '@neondatabase/serverless';
+const { sql } = require('@vercel/postgres');
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    try {
-      const { rows } = await pool.query(
-        'SELECT * FROM chat_messages WHERE timestamp > NOW() - INTERVAL \'24 hours\' ORDER BY timestamp ASC'
-      );
-      res.status(200).json(rows);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  try {
+    if (req.method === 'GET') {
+      // Fetch messages from last 24 hours
+      const { rows } = await sql`
+        SELECT id, username, text, timestamp 
+        FROM chat_messages 
+        WHERE timestamp > NOW() - INTERVAL '24 hours'
+        ORDER BY timestamp ASC
+      `;
+      return res.status(200).json(rows);
     }
-  } else if (req.method === 'POST') {
-    const { username, text } = req.body;
-    if (!username || !text) {
-      return res.status(400).json({ error: 'Missing username or text' });
+
+    if (req.method === 'POST') {
+      const { username, text } = req.body;
+      
+      if (!username || !text) {
+        return res.status(400).json({ error: 'Missing username or text' });
+      }
+
+      const { rows } = await sql`
+        INSERT INTO chat_messages (username, text) 
+        VALUES (${username}, ${text}) 
+        RETURNING id, username, text, timestamp
+      `;
+      
+      return res.status(201).json(rows[0]);
     }
-    
-    try {
-      const { rows } = await pool.query(
-        'INSERT INTO chat_messages (username, text) VALUES ($1, $2) RETURNING *',
-        [username, text]
-      );
-      res.status(201).json(rows[0]);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  } else {
+
+    // Method not allowed
     res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    
+  } catch (error) {
+    console.error('Chat API Error:', error);
+    return res.status(500).json({ error: `Server error: ${error.message}` });
   }
-}
+};
