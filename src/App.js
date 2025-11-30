@@ -706,7 +706,184 @@ const DiceRoller = ({ onClose }) => {
     </div>
   );
 };
+///
+// --- LOGIN OVERLAY ---
+const LoginOverlay = ({ onClose, onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Login failed');
+
+      localStorage.setItem('cosmicToken', data.token);
+      localStorage.setItem('cosmicUser', JSON.stringify(data.user));
+      
+      onLogin(data.user);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+      <div className="relative w-full max-w-md bg-gradient-to-br from-cyan-900/60 to-purple-900/60 rounded-3xl border-2 border-cyan-400/50 backdrop-blur-lg shadow-[0_0_80px_rgba(34,211,238,0.6)] p-8">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-cyan-400 hover:text-cyan-300">
+          <X className="w-6 h-6" />
+        </button>
+        
+        <div className="text-center space-y-4 mb-8">
+          <Sparkles className="w-12 h-12 text-cyan-400 mx-auto animate-pulse" />
+          <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300">
+            COSMIC LOGIN
+          </h2>
+          <p className="text-cyan-200 italic">Enter your cosmic credentials</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-cyan-300 font-semibold mb-2">Username</label>
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} 
+              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors" 
+              placeholder="Enter username..." required disabled={loading} />
+          </div>
+
+          <div>
+            <label className="block text-cyan-300 font-semibold mb-2">Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} 
+              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors" 
+              placeholder="Enter password..." required disabled={loading} />
+          </div>
+
+          {error && <div className="p-3 bg-red-900/40 border border-red-400/50 rounded-lg text-red-300 text-sm">{error}</div>}
+
+          <button type="submit" disabled={loading} 
+            className="w-full py-4 px-6 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold text-lg rounded-lg transition-all duration-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] disabled:opacity-50">
+            {loading ? 'LOGGING IN...' : 'ENTER THE COSMOS'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// --- CHAT BUBBLE ---
+const ChatBubble = ({ onToggle, unreadCount }) => (
+  <button onClick={onToggle} className="fixed bottom-8 right-8 z-[150] p-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full border-2 border-green-400 shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:shadow-[0_0_40px_rgba(34,197,94,0.7)] transition-all duration-300 transform hover:scale-110">
+    <MessageSquare className="w-6 h-6 text-white" />
+    {unreadCount > 0 && (
+      <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+        {unreadCount}
+      </span>
+    )}
+  </button>
+);
+
+// --- CHAT WINDOW ---
+const ChatWindow = ({ isOpen, onClose, currentUser }) => {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const saved = localStorage.getItem('cosmicChatMessages');
+      if (saved) setMessages(JSON.parse(saved));
+      localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('cosmicChatMessages', JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!newMessage.trim() || !currentUser) return;
+    const message = {
+      id: Date.now(),
+      username: currentUser.username,
+      text: newMessage.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, message]);
+    setNewMessage('');
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed bottom-28 right-8 z-[160] w-80 h-96 bg-gradient-to-br from-slate-900/98 to-slate-800/98 backdrop-blur-lg rounded-2xl border-2 border-green-400/50 shadow-[0_0_40px_rgba(34,197,94,0.6)] flex flex-col overflow-hidden">
+      <div className="p-4 bg-gradient-to-r from-green-600/80 to-emerald-600/80 border-b border-green-400/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-white" />
+          <h3 className="text-white font-bold">Cosmic Chat</h3>
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-white/20 rounded transition-colors">
+          <X className="w-4 h-4 text-white" />
+        </button>
+      </div>
+
+      <div className="flex-1 p-4 overflow-y-auto space-y-3">
+        {messages.length === 0 ? (
+          <div className="text-center text-slate-400 text-sm mt-8">
+            <p>No messages yet</p>
+            <p className="mt-2">Be the first to speak!</p>
+          </div>
+        ) : (
+          messages.map(msg => (
+            <div key={msg.id} className={`flex ${msg.username === currentUser.username ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs px-3 py-2 rounded-lg ${msg.username === currentUser.username ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-100'}`}>
+                <div className="text-xs opacity-70 mb-1">{msg.username}</div>
+                <div className="text-sm">{msg.text}</div>
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="p-3 border-t border-green-400/30 flex gap-2">
+        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={handleKeyPress}
+          placeholder="Type your message..."
+          className="flex-1 px-3 py-2 bg-slate-800/60 border border-green-400/30 rounded-lg text-slate-100 placeholder-slate-400 focus:border-green-400 focus:outline-none transition-colors text-sm" />
+        <button onClick={handleSend} disabled={!newMessage.trim()} className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 rounded-lg text-white transition-colors">
+          <span className="font-bold">Send</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+//////////
 // --- MAIN COMPONENT ---
 const CosmicSyndicate = () => {
   const [activeSection, setActiveSection] = useState('home');
@@ -726,6 +903,13 @@ const [reviews, setReviews] = useState([]);
   });
 
   
+  // Login and current user
+  const [showLogin, setShowLogin] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  // Chat Components
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  ///
   const [showCheckout, setShowCheckout] = useState(false);
   const [showCareers, setShowCareers] = useState(false);
   const [showOperations, setShowOperations] = useState(false);
@@ -757,6 +941,42 @@ const [reviews, setReviews] = useState([]);
 
   const mountRef = useRef(null);
 
+  // Users-Check for existing session on mount
+useEffect(() => {
+  const token = localStorage.getItem('cosmicToken');
+  const user = localStorage.getItem('cosmicUser');
+  
+  if (token && user) {
+    fetch('/api/auth', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
+        if (res.ok) {
+          setCurrentUser(JSON.parse(user));
+        } else {
+          localStorage.removeItem('cosmicToken');
+          localStorage.removeItem('cosmicUser');
+        }
+      });
+  }
+}, []);
+
+// Update unread count
+useEffect(() => {
+  if (!chatOpen && currentUser) {
+    const messages = JSON.parse(localStorage.getItem('cosmicChatMessages') || '[]');
+    const lastRead = localStorage.getItem('cosmicChatLastRead');
+    const unread = lastRead 
+      ? messages.filter(m => m.username !== currentUser.username && new Date(m.timestamp) > new Date(lastRead)).length
+      : messages.filter(m => m.username !== currentUser.username).length;
+    setUnreadCount(unread);
+  } else {
+    setUnreadCount(0);
+    localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
+  }
+  }, [chatOpen, currentUser]);
+
+  // Mouse Options
   useEffect(() => {
     const handleMouseMove = (e) => {
       setMousePos({ x: e.clientX, y: e.clientY });
@@ -1164,7 +1384,19 @@ const [reviews, setReviews] = useState([]);
 
     loadThreeJS();
   }, [showOperations]);
-
+  
+  /// Handle users longin
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('cosmicToken');
+    localStorage.removeItem('cosmicUser');
+    setCurrentUser(null);
+    setChatOpen(false);
+  };
+  
   // --- STANDARD FUNCTIONS ---
   const scrollToSection = (section) => {
     setActiveSection(section);
@@ -1421,6 +1653,14 @@ const submitReview = async (e) => {
       {showDiceRoller && (
         <DiceRoller onClose={() => setShowDiceRoller(false)} />
       )}
+      {/*Login OVERLAY */}     
+      {showLogin && <LoginOverlay onClose={() => setShowLogin(false)} onLogin={handleLogin} />}    
+
+      {/*Chat OVERLAY */}     
+
+      {currentUser && (<>
+       <ChatBubble onToggle={() => setChatOpen(!chatOpen)} unreadCount={unreadCount} />
+        <ChatWindow isOpen={chatOpen} onClose={() => setChatOpen(false)} currentUser={currentUser} /></>)}  
 
       {/* Checkout Page Overlay */}
       {showCheckout && (
@@ -2081,7 +2321,28 @@ const submitReview = async (e) => {
               </div>
               <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg opacity-0 group-hover:opacity-20 blur transition-opacity -z-10" />
             </button>
+            {/* User-check */}
+            {currentUser ? (
+              <button onClick={handleLogout}
+              className="group relative px-6 py-3 bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-red-400/50 rounded-lg backdrop-blur-sm hover:border-red-300 transition-all">
+                <div className="flex items-center gap-3">
+                <LogOut className="w-5 h-5 text-red-400" />
+                <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
+                </div>
+            </button>
+              ) : (
+              <button onClick={() => setShowLogin(true)}
+               className="group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-400/50   rounded-lg backdrop-blur-sm hover:border-green-300 transition-all">
+                <div className="flex items-center gap-3">
+                 <Users className="w-5 h-5 text-green-400" />
+                 <span className="text-green-100 font-semibold">Login</span>
+                 </div>
+              </button>
+                )}
+                
           </div>
+
+            {/* Mobile options */}    
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="lg:hidden p-2 text-cyan-400 hover:text-cyan-300"
@@ -2162,6 +2423,25 @@ const submitReview = async (e) => {
                 </span>
               </div>
             </button>
+           {/* User-check */}
+
+            {currentUser ? (
+              <button onClick={handleLogout} className="w-full group relative px-6 py-3 bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-red-400/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                <LogOut className="w-5 h-5 text-red-400" />
+                <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
+                </div>
+              </button>
+               ) : (
+             <button onClick={() => { setShowLogin(true); setMobileMenuOpen(false); }} 
+               className="w-full group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2        border-green-400/50 rounded-lg">
+                 <div className="flex items-center gap-3">
+                 <Users className="w-5 h-5 text-green-400" />
+                 <span className="text-green-100 font-semibold">Login</span>
+                 </div>
+                 </button>
+                  )}
+       
           </div>
         )}
       </nav>
