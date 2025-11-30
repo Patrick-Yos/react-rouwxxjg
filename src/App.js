@@ -797,39 +797,62 @@ const ChatBubble = ({ onToggle, unreadCount }) => (
 );
 
 // --- CHAT WINDOW ---
+// Add to imports at top of file
 const ChatWindow = ({ isOpen, onClose, currentUser }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
+  // Load messages when chat opens
   useEffect(() => {
-    if (isOpen) {
-      const saved = localStorage.getItem('cosmicChatMessages');
-      if (saved) setMessages(JSON.parse(saved));
-      localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
-    }
+    if (!isOpen) return;
+
+    const loadMessages = async () => {
+      try {
+        const response = await fetch('/api/chat-messages');
+        if (!response.ok) throw new Error('Failed to load');
+        const data = await response.json();
+        setMessages(data);
+        localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
+      } catch (error) {
+        console.error('Chat load error:', error);
+      }
+    };
+
+    loadMessages();
+    
+    // Poll for new messages every 3 seconds
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('cosmicChatMessages', JSON.stringify(messages));
-    }
-  }, [messages]);
-
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newMessage.trim() || !currentUser) return;
-    const message = {
-      id: Date.now(),
-      username: currentUser.username,
-      text: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+    
+    try {
+      await fetch('/api/chat-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentUser.username,
+          text: newMessage.trim()
+        })
+      });
+      
+      setNewMessage('');
+      
+      // Refresh messages immediately
+      const response = await fetch('/api/chat-messages');
+      const data = await response.json();
+      setMessages(data);
+    } catch (error) {
+      console.error('Send error:', error);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -847,6 +870,7 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-white" />
           <h3 className="text-white font-bold">Cosmic Chat</h3>
+          <span className="text-xs text-green-200">24hr</span>
         </div>
         <button onClick={onClose} className="p-1 hover:bg-white/20 rounded transition-colors">
           <X className="w-4 h-4 text-white" />
@@ -858,6 +882,7 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
           <div className="text-center text-slate-400 text-sm mt-8">
             <p>No messages yet</p>
             <p className="mt-2">Be the first to speak!</p>
+            <p className="text-xs mt-2 text-slate-500">History clears daily</p>
           </div>
         ) : (
           messages.map(msg => (
@@ -873,10 +898,19 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
       </div>
 
       <div className="p-3 border-t border-green-400/30 flex gap-2">
-        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={handleKeyPress}
+        <input 
+          type="text" 
+          value={newMessage} 
+          onChange={(e) => setNewMessage(e.target.value)} 
+          onKeyPress={handleKeyPress}
           placeholder="Type your message..."
-          className="flex-1 px-3 py-2 bg-slate-800/60 border border-green-400/30 rounded-lg text-slate-100 placeholder-slate-400 focus:border-green-400 focus:outline-none transition-colors text-sm" />
-        <button onClick={handleSend} disabled={!newMessage.trim()} className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 rounded-lg text-white transition-colors">
+          className="flex-1 px-3 py-2 bg-slate-800/60 border border-green-400/30 rounded-lg text-slate-100 placeholder-slate-400 focus:border-green-400 focus:outline-none transition-colors text-sm" 
+        />
+        <button 
+          onClick={handleSend} 
+          disabled={!newMessage.trim()} 
+          className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 rounded-lg text-white transition-colors"
+        >
           <span className="font-bold">Send</span>
         </button>
       </div>
