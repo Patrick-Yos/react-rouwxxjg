@@ -1211,6 +1211,29 @@ const [reviews, setReviews] = useState([]);
       0
     );
   };
+  // Render stars for average
+  const renderStars = (rating) => {
+    return [...Array(5)].map((_, i) => (
+      <Star
+        key={i}
+        className={`w-5 h-5 ${
+          i < Math.round(rating)
+            ? 'text-yellow-400 fill-yellow-400'
+            : 'text-gray-600'
+        }`}
+      />
+    ));
+  };
+// Average constant
+  const averageRating =
+  reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + parseFloat(r.rating), 0) /
+      reviews.length
+    : 0;
+
+
+
+  
 const submitReview = async (e) => {
   e.preventDefault();
   if (!newReview.name || !newReview.comment) return;
@@ -2405,14 +2428,14 @@ const submitReview = async (e) => {
               }
             />
             <TeamMember
-              name="RAGEN"
+              name="REIGEN"
               title="The Cosmic Closer"
               icon={Briefcase}
               color="from-amber-900/40 to-yellow-900/40"
               description={
                 <div className="space-y-3">
                   <p>
-                    Ragen is{' '}
+                    Reigen is{' '}
                     <strong className="text-amber-300">charm incarnate</strong>,
                     charisma weaponized, the man who could sell ice to a frost
                     giant and make them thank him for the privilege. He doesn't
@@ -2424,7 +2447,7 @@ const submitReview = async (e) => {
                     <strong className="text-yellow-300">
                       greatest business manager
                     </strong>{' '}
-                    in fifteen star systems, Ragen's reputation precedes him
+                    in fifteen star systems, Reigen's reputation precedes him
                     like a herald of prosperity. When he enters a negotiation,
                     opponents have already lost — they just don't know it yet.
                     His motivational speeches have turned cowards into heroes
@@ -2441,13 +2464,13 @@ const submitReview = async (e) => {
                   </p>
                   <p className="text-yellow-200 italic">
                     "Listen, friend — and we ARE friends — let me tell you about
-                    an opportunity that'll change your life..." — Ragen
+                    an opportunity that'll change your life..." — Reigen
                   </p>
                 </div>
               }
             />
             <TeamMember
-              name="JHONNY MITHRILHAND"
+              name="JOHNNY MITHRILHAND"
               title="The Rebel Legend"
               icon={Music}
               color="from-pink-900/40 to-rose-900/40"
@@ -2459,12 +2482,12 @@ const submitReview = async (e) => {
                   </p>
                   <p>
                     <strong className="text-rose-300">
-                      JHONNY MITHRILHAND
+                      JOHNNY MITHRILHAND
                     </strong>{' '}
                     — rock god, gun-slinging virtuoso, rebel icon, and owner of
                     the most legendary{' '}
                     <em className="text-cyan-300">mithril-metal arms</em> in the
-                    known universe. Where others see weapons, Jhonny sees
+                    known universe. Where others see weapons, Johnny sees
                     instruments. Where others see combat, he sees performance.
                   </p>
                   <p>
@@ -2485,7 +2508,7 @@ const submitReview = async (e) => {
                     <strong>ETERNAL</strong>.
                   </p>
                   <p className="text-rose-200 italic text-xl font-semibold">
-                    🎸 "Rock never dies, baby. Neither do I." — Jhonny
+                    🎸 "Rock never dies, baby. Neither do I." — Johnny
                     Mithrilhand 🎸
                   </p>
                 </div>
@@ -2535,7 +2558,7 @@ const submitReview = async (e) => {
                     <p>
                       <strong className="text-amber-300">To Spend Money</strong>{' '}
                       — wisely, foolishly, and everywhere in between (mostly on
-                      Jhonny's concert pyrotechnics)
+                      Johnny's concert pyrotechnics)
                     </p>
                   </div>
                   <div className="p-6 bg-black/30 rounded-xl border border-green-400/40">
@@ -2634,7 +2657,7 @@ const submitReview = async (e) => {
               description={
                 <div className="space-y-4">
                   <p>
-                    When Jhonny Mithrilhand announced he would perform a concert{' '}
+                    When Johnny Mithrilhand announced he would perform a concert{' '}
                     <strong className="text-pink-300">
                       across the living universe itself
                     </strong>
@@ -2643,7 +2666,7 @@ const submitReview = async (e) => {
                   </p>
                   <p>
                     Using ancient resonance technology and Hui's quantum
-                    amplification arrays, we broadcast Jhonny's music through
+                    amplification arrays, we broadcast Johnny's music through
                     the{' '}
                     <em className="text-cyan-300">
                       cosmic web of sentient nebulae
@@ -2689,7 +2712,7 @@ const submitReview = async (e) => {
                     pure code. He battled the rogue spirit in quantum cyberspace
                     while Bob infiltrated the servers physically. Chimer severed
                     the connection points between reality and simulation with
-                    precision strikes. Ragen convinced the trapped souls to{' '}
+                    precision strikes. Reigen convinced the trapped souls to{' '}
                     <em>choose</em> freedom.
                   </p>
                   <p>
@@ -2762,9 +2785,9 @@ const submitReview = async (e) => {
                     them to the highest bidder.
                   </p>
                   <p>
-                    Led by Jhonny Mithrilhand (because if you're going to bust a
+                    Led by Johnny Mithrilhand (because if you're going to bust a
                     soul-trafficking ring, you need <em>style</em>), our team —
-                    Ragen, Chimer, Bob, Hui, and a mysterious skater individual
+                    Reigen, Chimer, Bob, Hui, and a mysterious skater individual
                     whose identity remains classified — dismantled the entire
                     operation in one{' '}
                     <strong className="text-orange-300">
@@ -2994,17 +3017,17 @@ const submitReview = async (e) => {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <MerchItem
-              name="Jhonny Mithrilhand Signed Handkerchief"
+              name="Johnny Mithrilhand Signed Handkerchief"
               price="100"
               icon={Sparkles}
             />
             <MerchItem
-              name="Jhonny Mithrilhand Signed Shirt (All Sizes)"
+              name="Johnny Mithrilhand Signed Shirt (All Sizes)"
               price="300"
               icon={Star}
             />
             <MerchItem
-              name="Jhonny Mithrilhand Live Concert Ticket"
+              name="Johnny Mithrilhand Live Concert Ticket"
               price="3,000"
               icon={Music}
             />
@@ -3034,17 +3057,17 @@ const submitReview = async (e) => {
               icon={Flame}
             />
             <MerchItem
-              name="Ragen Business Management Pack (full session)"
+              name="Reigen Business Management Pack (full session)"
               price="350"
               icon={Briefcase}
             />
             <MerchItem
-              name="Ragen Student Discount Management Pack"
+              name="Reigen Student Discount Management Pack"
               price="250"
               icon={Star}
             />
             <MerchItem
-              name="Ragen Motivational & Wellbeing Lessons (per hour)"
+              name="Reigen Motivational & Wellbeing Lessons (per hour)"
               price="100"
               icon={Sparkles}
             />
@@ -3092,6 +3115,19 @@ const submitReview = async (e) => {
             <p className="text-xl text-purple-200 italic">
               What the universe says about us
             </p>
+
+
+          {reviews.length > 0 && (
+            <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-br from-purple-900/60 to-pink-900/60 rounded-xl border-2 border-purple-400/50 backdrop-blur-sm">
+            <span className="text-3xl font-bold text-white">
+            {averageRating.toFixed(1)}
+            </span>
+            <div className="flex gap-1">{renderStars(averageRating)}</div>
+            <span className="text-purple-200">
+            ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
+          </span>
+        </div>
+      )}
       </div>
     
           <div className="space-y-6">
