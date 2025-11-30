@@ -717,20 +717,6 @@ const [reviews, setReviews] = useState([]);
   useEffect(() => {
     loadReviews().then(setReviews);
     }, []);
-
-  const [avgRating, setAvgRating] = useState(0);
-
-// Calculate average whenever reviews change
-useEffect(() => {
-  if (reviews.length === 0) {
-    setAvgRating(0);
-    return;
-  }
-  
-  const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
-  setAvgRating((sum / reviews.length).toFixed(1));
-}, [reviews]);
-  
   const [newReview, setNewReview] = useState({
     name: '',
     rating: 5,
@@ -3106,33 +3092,6 @@ const submitReview = async (e) => {
               What the universe says about us
             </p>
           </div>
-
-        {/* Average Rating Display */}
-<div className="text-center mb-8 p-6 bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-2xl border-2 border-purple-400/50 backdrop-blur-lg">
-  <div className="flex items-center justify-center gap-4">
-    <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-300">
-      {avgRating}
-    </div>
-    <div className="flex flex-col items-start">
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`w-8 h-8 ${
-              star <= Math.round(avgRating)
-                ? 'text-yellow-400 fill-yellow-400'
-                : 'text-gray-700'
-            }`}
-          />
-        ))}
-      </div>
-      <div className="text-purple-300 text-sm mt-1">
-        {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
-      </div>
-    </div>
-  </div>
-</div>
-
           <div className="space-y-6">
             {reviews.map((review) => (
               <div
