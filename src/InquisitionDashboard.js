@@ -1,10 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DiceBox from '@3d-dice/dice-box';
-import { useGameEngine } from './useGameEngine';
-import { PlayButton } from './PlayButton';
-import { SkillsMenu } from './SkillsMenu';
 import { SkillRollModal } from './SkillRollModal';
-import { Anima } from './animation';import React, { useState, useEffect, useRef } from 'react';
 import DiceBox from '@3d-dice/dice-box';
 import { useGameEngine } from './useGameEngine';
 import { useAuth } from './useAuth'; // Added useAuth
@@ -18,7 +13,6 @@ import {
   Biohazard, Sparkles, Bug, ShieldCheck, Heart, Brain, Volume2, VolumeX,
   HelpCircle, Trophy as TrophyIcon, Search, Swords, AlertCircle, RotateCw, Gauge
 } from 'lucide-react';
-// --- ANIMATION SYSTEM (UNCHANGED) ---
 
 // --- LOGIN COMPONENT (WAS MISSING) ---
 const LoginOverlay = () => {
