@@ -1,20 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SkillRollModal } from './SkillRollModal';
-import DiceBox from '@3d-dice/dice-box';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './useGameEngine';
-import { useAuth } from './useAuth'; // Added useAuth
+import { useAuth } from './useAuth';
 import { PlayButton } from './PlayButton';
 import { SkillsMenu } from './SkillsMenu';
-import { Anima } from './animation'; // Use Imported Anima
+import { Anima } from './animation'; // Using the imported Anima
 import {
   Skull, Crosshair, Flame, Orbit, Book, Cpu, Scroll, Terminal, ChevronRight,
   ShieldAlert, Activity, X, Dices, AlertTriangle, Fingerprint, Eye, Target,
-  Zap, Lock, Sword, Radiation, // Changed Radioactive to Radiation
+  Zap, Sword, Radiation,
   Biohazard, Sparkles, Bug, ShieldCheck, Heart, Brain, Volume2, VolumeX,
   HelpCircle, Trophy as TrophyIcon, Search, Swords, AlertCircle, RotateCw, Gauge
 } from 'lucide-react';
+import DiceBox from '@3d-dice/dice-box';
 
-// --- LOGIN COMPONENT (WAS MISSING) ---
+// --- LOGIN COMPONENT ---
 const LoginOverlay = () => {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
@@ -50,124 +49,7 @@ const LoginOverlay = () => {
   );
 };
 
-
-const Anima = {
-  entry: (targets, delay = 0) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      opacity: [0, 1],
-      translateY: [30, 0],
-      scale: [0.95, 1],
-      duration: 600,
-      delay,
-      easing: 'easeOutCubic',
-    });
-  },
-  combat: (targets, intensity = 1) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      keyframes: [
-        { translateX: -3 * intensity, rotateZ: -2 * intensity },
-        { translateX: 3 * intensity, rotateZ: 2 * intensity },
-        { translateX: -3 * intensity, rotateZ: -2 * intensity },
-        { translateX: 0, rotateZ: 0 },
-      ],
-      duration: 300,
-      easing: 'easeInOutQuad',
-    });
-  },
-  exterminatus: (onComplete) => {
-    if (!window.anime) return;
-    return window.anime.timeline({
-      easing: 'easeOutExpo',
-      complete: onComplete,
-    });
-  },
-  corruption: (targets, intensity) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      filter: `hue-rotate(${intensity * 3.6}deg) brightness(${1 + intensity / 200})`,
-      duration: 2000,
-      easing: 'easeInOutQuad',
-    });
-  },
-  weaponFire: (targets) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      keyframes: [
-        { scale: 1, opacity: 1, boxShadow: '0 0 0 rgba(255,0,0,0)' },
-        { scale: 1.2, opacity: 0.8, boxShadow: '0 0 20px rgba(255,0,0,0.8)' },
-        { scale: 1, opacity: 1, boxShadow: '0 0 0 rgba(255,0,0,0)' },
-      ],
-      duration: 200,
-      easing: 'easeOutQuad',
-    });
-  },
-  pulse: (targets) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      scale: [1, 1.05, 1],
-      duration: 1000,
-      loop: true,
-      easing: 'easeInOutQuad',
-    });
-  },
-  shake: (targets, intensity = 5) => {
-    if (!window.anime) return;
-    return window.anime({
-      targets,
-      translateX: [
-        { value: -intensity, duration: 50 },
-        { value: intensity, duration: 50 },
-        { value: -intensity, duration: 50 },
-        { value: 0, duration: 50 },
-      ],
-      loop: 3,
-    });
-  },
-  notify: (message, type = 'info') => {
-    if (!window.anime) return;
-    const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 z-[300] px-4 py-2 font-tech text-xs border ${
-      type === 'success'
-        ? 'border-green-500 text-green-400 bg-black/95'
-        : type === 'error'
-        ? 'border-red-500 text-red-400 bg-black/95'
-        : type === 'warning'
-        ? 'border-yellow-500 text-yellow-400 bg-black/95'
-        : 'border-[#c5a059] text-[#c5a059] bg-black/95'
-    } shadow-[0_0_20px_rgba(0,0,0,0.8)] max-w-xs transform translate-x-full opacity-0`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    window
-      .anime({
-        targets: toast,
-        translateX: [300, 0],
-        opacity: [0, 1],
-        duration: 300,
-        easing: 'easeOutCubic',
-      })
-      .finished.then(() => {
-        setTimeout(() => {
-          window.anime({
-            targets: toast,
-            translateX: [0, 300],
-            opacity: [1, 0],
-            duration: 300,
-            complete: () => toast.remove(),
-          });
-        }, 3000);
-      });
-  },
-};
-
-// --- GLOBAL STYLES (UNCHANGED) ---
+// --- GLOBAL STYLES ---
 const ImperialGlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Share+Tech+Mono&family=Inter:wght@400;600;700&display=swap');
@@ -262,11 +144,11 @@ const ImperialGlobalStyles = () => (
   `}</style>
 );
 
-// --- TEXT SCRAMBLE COMPONENT (UNCHANGED) ---
+// --- TEXT SCRAMBLE COMPONENT ---
 const DecryptText = ({ text, className, chaosLevel = 0 }) => {
   const [display, setDisplay] = useState(text);
   const chars = '!@#$%^&*()_+-=[]{}|;:,.<>?/0123456789ABCDEF';
-  const corruptedChars = 'W̴̢̮̖͉̦̞̋͒͛̇Ä̵̼̜̫͉̭́̓̈́̑́R̸͉͋͋͝P̸̛̰̟̖͓̓̔̒̑̈́ ̴͍̐͐̓Ṫ̸̳̘̹̫̉̃̾̉̄Ą̶͉̬̯̬͒̍̕͝Ị̵̛̈́̋͛͝Ņ̸̛̗̰̲̲̙̈́̈͘T̶̛̻̘̰̦̮̒͗͒S̵̤̟̦̥̪̱̓̅͝';
+  const corruptedChars = 'W̴̢̮̖͉̦̞̋͒͛̇Ä̵̼̜̫͉̭́̓̈́̑́R̸͉͋͋͝P̸̛̰̟̖͓̓̔̒̑̈́ ̴͍̐͐̓Ṫ̸̳̘̹̫̉̃̾̉̄Ą̶͉̬̯̬͒̍̕͝Ị̵̛̈́̋͛͝Ņ̸̛̗̰̲̲̙̈́̈͘T̶̛̻̘̰̦̮̒͗͒S̵̤̟̦̥̪̱̓̅͝';
 
   useEffect(() => {
     let iteration = 0;
@@ -300,7 +182,7 @@ const DecryptText = ({ text, className, chaosLevel = 0 }) => {
   );
 };
 
-// --- TACTICAL AUSPEX COMPONENT (UNCHANGED) ---
+// --- TACTICAL AUSPEX COMPONENT ---
 const TacticalAuspex = ({ onClose, chaosLevel }) => {
   const [result, setResult] = useState(null);
   const [rolling, setRolling] = useState(false);
@@ -499,7 +381,7 @@ const TacticalAuspex = ({ onClose, chaosLevel }) => {
   );
 };
 
-// --- ENHANCED WEAPON SYSTEM (UNCHANGED) ---
+// --- ENHANCED WEAPON SYSTEM ---
 const WeaponSelector = ({ selectedWeapon, onSelectWeapon, chaosLevel }) => {
   const [weapons, setWeapons] = useState([
     {
@@ -555,7 +437,7 @@ const WeaponSelector = ({ selectedWeapon, onSelectWeapon, chaosLevel }) => {
       dmg: '4d10',
       range: '12"',
       type: 'melta',
-      icon: Radioactive,
+      icon: Radiation,
       color: 'text-yellow-400',
       ammo: 2,
       maxAmmo: 2,
@@ -692,7 +574,7 @@ const WeaponSelector = ({ selectedWeapon, onSelectWeapon, chaosLevel }) => {
   );
 };
 
-// --- ENHANCED ENEMY SYSTEM (UNCHANGED) ---
+// --- ENHANCED ENEMY SYSTEM ---
 const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
   const [scannedEnemy, setScannedEnemy] = useState(null);
 
@@ -728,7 +610,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
       name: 'PLAGUEBEARER',
       hp: 30,
       threat: 2,
-      icon: Radioactive,
+      icon: Radiation,
       color: 'text-green-400',
       weakTo: 'PLASMA GUN',
       type: 'daemonic',
@@ -870,7 +752,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
   );
 };
 
-// --- MACHINE SPIRIT CONSOLE (UNCHANGED) ---
+// --- MACHINE SPIRIT CONSOLE ---
 const MachineSpiritConsole = ({ satisfaction, setSatisfaction }) => {
   const [praying, setPraying] = useState(false);
   const [favor, setFavor] = useState(0);
@@ -945,7 +827,7 @@ const MachineSpiritConsole = ({ satisfaction, setSatisfaction }) => {
   );
 };
 
-// --- CHAOS METER (UNCHANGED) ---
+// --- CHAOS METER ---
 const ChaosMeter = ({ level, setLevel }) => {
   const [streak, setStreak] = useState(0);
 
@@ -1003,7 +885,7 @@ const ChaosMeter = ({ level, setLevel }) => {
   );
 };
 
-// --- ENHANCED PLANET VISUALIZER (UNCHANGED) ---
+// --- ENHANCED PLANET VISUALIZER ---
 const PlanetVisualizer = ({ damage = 0, onOrbitalStrike }) => {
   const [orbitalStrikes, setOrbitalStrikes] = useState([]);
   const [scanning, setScanning] = useState(false);
