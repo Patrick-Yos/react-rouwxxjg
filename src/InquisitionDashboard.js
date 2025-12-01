@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import DiceBox from '@3d-dice/dice-box';
 import {
-  // Core Icons
+  // Core Icons//
   Skull,
   Crosshair,
   Flame,
