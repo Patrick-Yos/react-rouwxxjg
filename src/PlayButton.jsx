@@ -1,7 +1,6 @@
-import { useGameEngine } from '../hooks/useGameEngine';
+import { useGameEngine } from './useGameEngine';
 import { Play, Lock, Skull } from 'lucide-react';
-import { LoginOverlay } from './LoginOverlay';
-
+  
 export const PlayButton = () => {
   const { user } = useAuth();
   const { characters, selectCharacter } = useGameEngine();
@@ -79,4 +78,5 @@ export const PlayButton = () => {
       )}
     </div>
   );
+
 };
