@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './useGameEngine';
-import { DiceBox } from '@3d-dice/dice-box';
+import DiceBox from '@3d-dice/dice-box'; // <--- FIXED: Default import (no curly braces)
 import { X, Zap, AlertTriangle, Trophy } from 'lucide-react';
 import { Anima } from './animation';
 
@@ -136,3 +136,4 @@ export const SkillRollModal = ({ skill, onClose }) => {
     </div>
   );
 };
+
