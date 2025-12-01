@@ -1,6 +1,7 @@
 import { useGameEngine } from './useGameEngine';
 import { Play, Lock, Skull } from 'lucide-react';
-  
+import { Anima } from './animation';
+
 export const PlayButton = () => {
   const { user } = useAuth();
   const { characters, selectCharacter } = useGameEngine();
@@ -80,3 +81,4 @@ export const PlayButton = () => {
   );
 
 };
+
