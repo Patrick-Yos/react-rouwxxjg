@@ -1,45 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameEngine } from './useGameEngine';
 import { DiceBox } from '@3d-dice/dice-box';
 import { X, Zap, AlertTriangle, Trophy } from 'lucide-react';
-import Anima from './animation';
+import { Anima } from './animation';
 
 export const SkillRollModal = ({ skill, onClose }) => {
   const { rollSkill, isRolling } = useGameEngine();
   const [customModifier, setCustomModifier] = useState(0);
   const [rollResult, setRollResult] = useState(null);
-  const diceBoxRef = useState(null);
+  const diceBoxRef = useRef(null); // Changed to useRef
 
   useEffect(() => {
-    // Initialize DiceBox for animation
+    let box = null;
     const initBox = async () => {
-      const box = new DiceBox('#skill-dice-canvas', {
-        id: '#skill-dice-box',
-        assetPath: 'assets/',
-        origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.4/dist/',
+      box = new DiceBox('#skill-dice-canvas', {
+        id: 'skill-dice-box-instance', // Unique ID
+        assetPath: '/assets/', // Ensure this path exists in your public folder
         theme: 'default',
         themeColor: '#c5a059',
-        scale: 35
+        scale: 6
       });
-      diceBoxRef.current = box;
       await box.init();
+      diceBoxRef.current = box;
+      // Expose to window for GameEngine to trigger if needed, though local ref is better
+      window.diceBox = box; 
     };
     initBox();
 
-    // Keyboard: ESC to close, R to reroll
     const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
       if (e.key.toLowerCase() === 'r') handleRoll();
     };
     window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    return () => {
+        window.removeEventListener('keydown', handleKey);
+        // Clean up dice box if possible, or just dereference
+        window.diceBox = null;
+    };
   }, []);
 
   const handleRoll = async () => {
-    const result = await rollSkill(skill.id, customModifier, 'Custom Modifier');
+    // Pass the local diceBox instance to the roller
+    const result = await rollSkill(skill.id, customModifier, 'Custom Modifier', diceBoxRef.current);
     setRollResult(result);
     
-    // Animate result flash
     if (result.success) {
       Anima.weaponFire('.roll-result-success');
     } else {
@@ -62,12 +66,12 @@ export const SkillRollModal = ({ skill, onClose }) => {
 
         {/* Dice Canvas */}
         <div className="p-6 bg-black relative">
-          <div id="skill-dice-canvas" className="w-full h-48 mb-4"></div>
+          <div id="skill-dice-canvas" className="w-full h-48 mb-4 relative z-10"></div>
 
           {/* Result Display */}
           {rollResult && !isRolling && (
             <div className={`roll-result-${rollResult.success ? 'success' : 'failure'} 
-                           absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center`}>
+                           absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center z-20`}>
               <div className={`
                 text-8xl font-black font-mono mb-2 drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]
                 ${rollResult.is_critical_success ? 'text-green-400 animate-pulse' :
@@ -77,7 +81,7 @@ export const SkillRollModal = ({ skill, onClose }) => {
                 {rollResult.raw_roll}
               </div>
               
-              <div className="font-tech text-sm space-y-1">
+              <div className="font-tech text-sm space-y-1 bg-black/80 p-2 border border-[#333]">
                 <div className="text-[#c5a059]">
                   Target: {rollResult.final_target}
                 </div>
@@ -87,18 +91,6 @@ export const SkillRollModal = ({ skill, onClose }) => {
                     : `${Math.abs(rollResult.degrees_of_success)}° Failure`}
                 </div>
               </div>
-
-              {/* Critical/Fumble Badge */}
-              {rollResult.is_critical_success && (
-                <div className="mt-2 text-green-500 font-tech text-xs animate-bounce">
-                  <Trophy className="w-4 h-4 inline mr-1" /> CRITICAL SUCCESS
-                </div>
-              )}
-              {rollResult.is_critical_failure && (
-                <div className="mt-2 text-red-500 font-tech text-xs animate-pulse">
-                  <AlertTriangle className="w-4 h-4 inline mr-1" /> CATASTROPHIC FAILURE
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -139,20 +131,8 @@ export const SkillRollModal = ({ skill, onClose }) => {
               'EXECUTE SKILL TEST'
             )}
           </button>
-
-          {/* Predicted Outcome */}
-          {!rollResult && (
-            <div className="mt-4 p-3 bg-[#111] border border-[#333] font-tech text-xs">
-              <div className="text-zinc-400 mb-1">PREDICTED SUCCESS RATE:</div>
-              <div className="text-green-400 font-bold">
-                {Math.max(0, Math.min(100, skill.final_target + customModifier))}%
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
-
 };
-
