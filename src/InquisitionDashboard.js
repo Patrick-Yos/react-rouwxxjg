@@ -1003,13 +1003,8 @@ const PlanetVisualizer = ({ damage = 0, onOrbitalStrike }) => {
 // --- MAIN COMPONENT (INTEGRATED) ---
 const InquisitionDashboard = ({ onNavigate }) => {
   // CORE STATE
-  const { 
-    user, 
-    selectedCharacter, 
-    rollSkill, 
-    isRolling,
-    characters 
-  } = useGameEngine();
+const { selectedCharacter, rollSkill, isRolling } = useGameEngine();
+const { user } = useAuth(); // Get user from useAuth instead
   
   // UI STATE
   const [mode, setMode] = useState('STANDARD');
