@@ -426,7 +426,7 @@ const TacticalAuspex = ({ onClose, chaosLevel }) => {
         </div>
 
         <div className="flex-1 bg-black relative overflow-hidden">
-          <div id="auspex-canvas" className="absolute inset-0 z-10"></div>
+          <div id="auspex-canvas" className="absolute inset-0 z-10 w-full h-full"></div>
 
           {result !== null && !rolling && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
