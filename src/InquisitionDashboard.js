@@ -1,58 +1,177 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DiceBox from '@3d-dice/dice-box'; // Fixed: Default import
-import { useGameEngine } from './useGameEngine';
-import { useAuth, AuthProvider } from './useAuth'; // Fixed: Added Provider import
-import { PlayButton } from './PlayButton';
-import { SkillsMenu } from './SkillsMenu';
-import { SkillRollModal } from './SkillRollModal';
-import { Anima } from './animation'; // Fixed: We use this, and removed the duplicate local definition below
+import DiceBox from '@3d-dice/dice-box';
 import {
-  Skull, Crosshair, Flame, Orbit, Book, Cpu, Scroll, Terminal, ChevronRight,
-  ShieldAlert, Activity, X, Dices, AlertTriangle, Fingerprint, Eye, Target,
-  Zap, Lock, BarChart3, Globe, Wifi, Sword, Radiation, Biohazard, Sparkles,
-  Bug, ShieldCheck, Heart, Brain, Volume2, VolumeX, ChevronDown, RotateCw,
-  Gauge, AlertOctagon, Check, AlertCircle, HelpCircle, Trophy, Search,
-  Swords, Trophy as TrophyIcon
+  // Core Icons
+  Skull,
+  Crosshair,
+  Flame,
+  Orbit,
+  Book,
+  Cpu,
+  Scroll,
+  Terminal,
+  ChevronRight,
+  ShieldAlert,
+  Activity,
+  X,
+  Dices,
+  AlertTriangle,
+  Fingerprint,
+  Radio,
+  Eye,
+  Target,
+  Zap,
+  Lock,
+  BarChart3,
+  Globe,
+  Wifi,
+  Sword,
+  Radioactive,
+  Biohazard,
+  Sparkles,
+  Bug,
+  ShieldCheck,
+  Heart,
+  Brain,
+  Volume2,
+  VolumeX,
+  ChevronDown,
+  RotateCw,
+  Gauge,
+  AlertOctagon,
+  Check,
+  AlertCircle,
+  HelpCircle,
+  Trophy,
+  Search,
+  Swords,
+  Trophy as TrophyIcon,
 } from 'lucide-react';
 
-// --- LOGIN COMPONENT ---
-const LoginOverlay = () => {
-  const { login } = useAuth();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+// --- ANIMATION SYSTEM ---
+const Anima = {
+  entry: (targets, delay = 0) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      opacity: [0, 1],
+      translateY: [30, 0],
+      scale: [0.95, 1],
+      duration: 600,
+      delay,
+      easing: 'easeOutCubic',
+    });
+  },
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    const success = login(username, password);
-    if(success) {
-        const overlay = document.getElementById('login-overlay');
-        if(overlay) overlay.classList.add('hidden');
-        Anima.notify('IDENTITY VERIFIED', 'success');
-    }
-  };
+  combat: (targets, intensity = 1) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      keyframes: [
+        { translateX: -3 * intensity, rotateZ: -2 * intensity },
+        { translateX: 3 * intensity, rotateZ: 2 * intensity },
+        { translateX: -3 * intensity, rotateZ: -2 * intensity },
+        { translateX: 0, rotateZ: 0 },
+      ],
+      duration: 300,
+      easing: 'easeInOutQuad',
+    });
+  },
 
-  return (
-    <div id="login-overlay" className="fixed inset-0 z-[1000] bg-black flex items-center justify-center hidden">
-      <div className="w-full max-w-md bg-[#111] border-4 border-[#5a2e2e] p-8 shadow-[0_0_50px_rgba(90,46,46,0.5)]">
-         <h2 className="text-3xl font-gothic text-red-600 mb-6 text-center">IDENTITY REQUIRED</h2>
-         <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-                <label className="text-[#c5a059] font-tech text-xs">IDENT CODE</label>
-                <input type="text" value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-black border border-[#c5a059] p-2 text-[#c5a059]" />
-            </div>
-            <div>
-                <label className="text-[#c5a059] font-tech text-xs">CYPHER</label>
-                <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-black border border-[#c5a059] p-2 text-[#c5a059]" />
-            </div>
-            <button type="submit" className="w-full bg-red-900 text-white font-gothic py-3 border border-red-500 hover:bg-red-700">SUBMIT CREDENTIALS</button>
-         </form>
-         <button onClick={() => {
-             const overlay = document.getElementById('login-overlay');
-             if(overlay) overlay.classList.add('hidden');
-         }} className="mt-4 text-xs text-zinc-500 w-full text-center hover:text-white">CANCEL</button>
-      </div>
-    </div>
-  );
+  exterminatus: (onComplete) => {
+    if (!window.anime) return;
+    return window.anime.timeline({
+      easing: 'easeOutExpo',
+      complete: onComplete,
+    });
+  },
+
+  corruption: (targets, intensity) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      filter: `hue-rotate(${intensity * 3.6}deg) brightness(${
+        1 + intensity / 200
+      })`,
+      duration: 2000,
+      easing: 'easeInOutQuad',
+    });
+  },
+
+  weaponFire: (targets) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      keyframes: [
+        { scale: 1, opacity: 1, boxShadow: '0 0 0 rgba(255,0,0,0)' },
+        { scale: 1.2, opacity: 0.8, boxShadow: '0 0 20px rgba(255,0,0,0.8)' },
+        { scale: 1, opacity: 1, boxShadow: '0 0 0 rgba(255,0,0,0)' },
+      ],
+      duration: 200,
+      easing: 'easeOutQuad',
+    });
+  },
+
+  pulse: (targets) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      scale: [1, 1.05, 1],
+      duration: 1000,
+      loop: true,
+      easing: 'easeInOutQuad',
+    });
+  },
+
+  shake: (targets, intensity = 5) => {
+    if (!window.anime) return;
+    return window.anime({
+      targets,
+      translateX: [
+        { value: -intensity, duration: 50 },
+        { value: intensity, duration: 50 },
+        { value: -intensity, duration: 50 },
+        { value: 0, duration: 50 },
+      ],
+      loop: 3,
+    });
+  },
+
+  notify: (message, type = 'info') => {
+    if (!window.anime) return;
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 z-[300] px-4 py-2 font-tech text-xs border ${
+      type === 'success'
+        ? 'border-green-500 text-green-400 bg-black/95'
+        : type === 'error'
+        ? 'border-red-500 text-red-400 bg-black/95'
+        : type === 'warning'
+        ? 'border-yellow-500 text-yellow-400 bg-black/95'
+        : 'border-[#c5a059] text-[#c5a059] bg-black/95'
+    } shadow-[0_0_20px_rgba(0,0,0,0.8)] max-w-xs transform translate-x-full opacity-0`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    window
+      .anime({
+        targets: toast,
+        translateX: [300, 0],
+        opacity: [0, 1],
+        duration: 300,
+        easing: 'easeOutCubic',
+      })
+      .finished.then(() => {
+        setTimeout(() => {
+          window.anime({
+            targets: toast,
+            translateX: [0, 300],
+            opacity: [1, 0],
+            duration: 300,
+            complete: () => toast.remove(),
+          });
+        }, 3000);
+      });
+  },
 };
 
 // --- GLOBAL STYLES ---
@@ -108,6 +227,16 @@ const ImperialGlobalStyles = () => (
     ::-webkit-scrollbar-thumb { background: var(--gold-trim); border-radius: 2px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--gold-bright); }
 
+    /* PLANETARY ROTATION */
+    @keyframes rotate-planet { 
+      from { background-position: 0 0; } 
+      to { background-position: 200% 0; } 
+    }
+    .planet-texture { 
+      background-image: url('https://www.transparenttextures.com/patterns/black-scales.png'); 
+      animation: rotate-planet 20s linear infinite;
+    }
+
     /* BLOOD SPLATTER */
     .blood-splatter {
       background-image: url('https://www.transparenttextures.com/patterns/red-blood.png');
@@ -154,7 +283,7 @@ const ImperialGlobalStyles = () => (
 const DecryptText = ({ text, className, chaosLevel = 0 }) => {
   const [display, setDisplay] = useState(text);
   const chars = '!@#$%^&*()_+-=[]{}|;:,.<>?/0123456789ABCDEF';
-  const corruptedChars = 'W̴̢̮̖͉̦̞̋͒͛̇Ä̵̼̜̫͉̭́̓̈́̑́R̸͉͋͋͝P̸̛̰̟̖͓̓̔̒̑̈́ ̴͍̐͐̓Ṫ̸̳̘̹̫̉̃̾̉̄Ą̶͉̬̯̬͒̍̕͝Ị̵̛̈́̋͛͝Ņ̸̛̗̰̲̲̙̈́̈͘T̶̛̻̘̰̦̮̒͗͒S̵̤̟̦̥̪̱̓̅͝';
+  const corruptedChars = 'W̴̢̮̖͉̦̞̋͒͛̇Ä̵̼̜̫͉̭́̓̈́̑́R̸͉͋͋͝P̸̛̰̟̖͓̓̔̒̑̈́ ̴͍̐͐̓Ṫ̸̳̘̹̫̉̃̾̉̄Ą̶͉̬̯̬͒̍̕͝Ị̵̛̈́̋͛͝Ņ̸̛̗̰̲̲̙̈́̈͘T̶̛̻̘̰̦̮̒͗͒S̵̤̟̦̥̪̱̓̅͝';
 
   useEffect(() => {
     let iteration = 0;
@@ -209,18 +338,16 @@ const TacticalAuspex = ({ onClose, chaosLevel }) => {
 
     const initBox = async () => {
       try {
-        if(document.querySelector('#auspex-canvas')) {
-            const box = new DiceBox('#auspex-canvas', {
-            id: '#dice-box',
-            assetPath: '/assets/', // Ensure this exists
-            theme: 'default',
-            themeColor: '#800000',
-            scale: 25,
-            offscreen: true,
-            });
-            diceBoxRef.current = box;
-            await box.init();
-        }
+        const box = new DiceBox('#auspex-canvas', {
+          id: '#dice-box',
+          assetPath: 'assets/',
+          origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.4/dist/',
+          theme: 'default',
+          themeColor: '#800000',
+          scale: 25,
+        });
+        diceBoxRef.current = box;
+        await box.init();
       } catch (e) {
         console.error(e);
       }
@@ -299,7 +426,7 @@ const TacticalAuspex = ({ onClose, chaosLevel }) => {
         </div>
 
         <div className="flex-1 bg-black relative overflow-hidden">
-          <div id="auspex-canvas" className="absolute inset-0 z-10 w-full h-full"></div>
+          <div id="auspex-canvas" className="absolute inset-0 z-10"></div>
 
           {result !== null && !rolling && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
@@ -444,7 +571,7 @@ const WeaponSelector = ({ selectedWeapon, onSelectWeapon, chaosLevel }) => {
       dmg: '4d10',
       range: '12"',
       type: 'melta',
-      icon: Radiation,
+      icon: Radioactive,
       color: 'text-yellow-400',
       ammo: 2,
       maxAmmo: 2,
@@ -617,7 +744,7 @@ const EnemyTacticalDisplay = ({ enemies, onEngage, chaosLevel, onPurge }) => {
       name: 'PLAGUEBEARER',
       hp: 30,
       threat: 2,
-      icon: Radiation,
+      icon: Radioactive,
       color: 'text-green-400',
       weakTo: 'PLASMA GUN',
       type: 'daemonic',
@@ -1000,13 +1127,8 @@ const PlanetVisualizer = ({ damage = 0, onOrbitalStrike }) => {
   );
 };
 
-// --- MAIN COMPONENT (INTEGRATED) ---
+// --- MAIN COMPONENT ---
 const InquisitionDashboard = ({ onNavigate }) => {
-  // CORE STATE
-const { selectedCharacter, rollSkill, isRolling } = useGameEngine();
-const { user } = useAuth(); // Get user from useAuth instead
-  
-  // UI STATE
   const [mode, setMode] = useState('STANDARD');
   const [tab, setTab] = useState('SQUAD');
   const [showDice, setShowDice] = useState(false);
@@ -1015,6 +1137,7 @@ const { user } = useAuth(); // Get user from useAuth instead
   const [combatLogs, setCombatLogs] = useState([]);
   const [animeReady, setAnimeReady] = useState(false);
   const [audioContext, setAudioContext] = useState(null);
+
   const [chaosLevel, setChaosLevel] = useState(15);
   const [selectedWeapon, setSelectedWeapon] = useState(null);
   const [enemies, setEnemies] = useState([]);
@@ -1023,16 +1146,17 @@ const { user } = useAuth(); // Get user from useAuth instead
   const [audioMuted, setAudioMuted] = useState(false);
   const [exterminatusCountdown, setExterminatusCountdown] = useState(10);
   const [favor, setFavor] = useState(5);
-  
+
   const containerRef = useRef(null);
   const exterminatusInterval = useRef(null);
 
-  // AUDIO SYSTEM
+  // Audio System
   useEffect(() => {
-    if (!audioMuted && !audioContext) {
+    if (!audioMuted) {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       setAudioContext(ctx);
       
+      // Create ambient hum
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
       oscillator.type = 'sawtooth';
@@ -1047,54 +1171,46 @@ const { user } = useAuth(); // Get user from useAuth instead
         ctx.close();
       };
     }
-  }, [audioMuted, audioContext]);
+  }, [audioMuted]);
 
-  // INITIALIZATION
   useEffect(() => {
-    // Check if script already exists to avoid dupes
-    if(!document.querySelector('script[src*="anime.min.js"]')) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js';
-        script.async = true;
-        script.onload = () => {
-        setAnimeReady(true);
-        if(window.anime) {
-            const timeline = window.anime.timeline({
-                easing: 'cubicBezier(.5, .05, .1, .3)',
-            });
+    const script = document.createElement('script');
+    script.src =
+      'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js';
+    script.async = true;
+    script.onload = () => {
+      setAnimeReady(true);
+      const timeline = window.anime.timeline({
+        easing: 'cubicBezier(.5, .05, .1, .3)',
+      });
 
-            timeline
-                .add({
-                targets: '.main-interface',
-                scaleY: [0.01, 1],
-                opacity: [0, 1],
-                duration: 800,
-                })
-                .add(
-                { targets: '.scanlines', opacity: [0, 1], duration: 1000 },
-                '-=400'
-                )
-                .add(
-                {
-                    targets: '.boot-sequence',
-                    opacity: [0, 1],
-                    translateX: [-20, 0],
-                    duration: 600,
-                },
-                '-=200'
-                )
-                .finished.then(() => {
-                addLog('NOOSPHERE SYNCHRONIZED...');
-                Anima.notify('INQUISITORIAL CLEARANCE VERIFIED', 'success');
-                });
-        }
-        };
-        document.body.appendChild(script);
-    } else {
-        setAnimeReady(true);
-    }
+      timeline
+        .add({
+          targets: '.main-interface',
+          scaleY: [0.01, 1],
+          opacity: [0, 1],
+          duration: 800,
+        })
+        .add(
+          { targets: '.scanlines', opacity: [0, 1], duration: 1000 },
+          '-=400'
+        )
+        .add(
+          {
+            targets: '.boot-sequence',
+            opacity: [0, 1],
+            translateX: [-20, 0],
+            duration: 600,
+          },
+          '-=200'
+        )
+        .finished.then(() => {
+          addLog('NOOSPHERE SYNCHRONIZED...');
+          Anima.notify('INQUISITORIAL CLEARANCE VERIFIED', 'success');
+        });
+    };
+    document.body.appendChild(script);
 
-    // KEYBOARD SHORTCUTS
     const handleKeyPress = (e) => {
       if (e.key === '1') setTab('SQUAD');
       if (e.key === '2') setTab('MISSION');
@@ -1104,14 +1220,13 @@ const { user } = useAuth(); // Get user from useAuth instead
         e.preventDefault();
         if (!exterminatus) handleExterminatus();
       }
-      if (e.key.toLowerCase() === 'r') {
+      if (e.key === 'r' || e.key === 'R') {
         setSelectedWeapon(null);
         Anima.notify('WEAPONS RESET', 'info');
       }
     };
     window.addEventListener('keydown', handleKeyPress);
 
-    // CHAOS & EVENT TIMERS
     const chaosTimer = setInterval(() => {
       setChaosLevel((prev) => Math.min(100, prev + Math.random() * 2));
     }, 5000);
@@ -1132,6 +1247,7 @@ const { user } = useAuth(); // Get user from useAuth instead
       const event = events[Math.floor(Math.random() * events.length)];
       addCombatLog(event.msg);
       setChaosLevel((prev) => Math.max(0, Math.min(100, prev + event.level)));
+      // REMOVED: Anima.notify(event.msg, event.type);
     }, 15000);
 
     return () => {
@@ -1139,7 +1255,7 @@ const { user } = useAuth(); // Get user from useAuth instead
       clearInterval(eventTimer);
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [exterminatus]);
+  }, []);
 
   useEffect(() => {
     if (animeReady && window.anime) {
@@ -1147,18 +1263,8 @@ const { user } = useAuth(); // Get user from useAuth instead
     }
   }, [tab, animeReady]);
 
-  // CHARACTER LOAD EFFECT
-  useEffect(() => {
-    if (selectedCharacter) {
-      addLog(`OPERATIVE LOADED: ${selectedCharacter.name}`);
-      Anima.notify(`CHARACTER: ${selectedCharacter.name}`, 'success');
-      Anima.entry('.character-panel', 200);
-    }
-  }, [selectedCharacter]);
-
-  // EXTERMINATUS HANDLER
   const handleExterminatus = () => {
-    if (exterminatus || favor < 3) {
+    if (exterminatus || !animeReady || favor < 3) {
       if (favor < 3)
         Anima.notify('REQUIRES 3 FAVOR TO INVOKE EXTERMINATUS', 'error');
       return;
@@ -1231,7 +1337,6 @@ const { user } = useAuth(); // Get user from useAuth instead
       );
   };
 
-  // LOGGING
   const addLog = (msg) => {
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
     const imperialDate = `${Math.floor(Math.random() * 9) + 1}.${Math.floor(
@@ -1255,12 +1360,11 @@ const { user } = useAuth(); // Get user from useAuth instead
 
   const showShortcuts = () => {
     Anima.notify(
-      'SHORTCUTS: [1,2,3,4]=Tabs [SPACE]=Exterminatus [R]=Reset Weapons',
+      'SHORTCUTS: [1,2,3,4]=Tabs [SPACE]=Exterminatus [R]=Reset',
       'info'
     );
   };
 
-  // RETINUE DATA
   const retinue = [
     {
       name: 'MAGOS KQ-234',
@@ -1337,7 +1441,6 @@ const { user } = useAuth(); // Get user from useAuth instead
       } ${chaosLevel > 70 ? 'warp-corruption' : ''}`}
     >
       <ImperialGlobalStyles />
-      <LoginOverlay />
 
       <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_center,_#1a1a1a_0%,_#000000_100%)]"></div>
       {mode === 'AUSPEX' && (
@@ -1403,9 +1506,6 @@ const { user } = useAuth(); // Get user from useAuth instead
         </div>
 
         <div className="flex items-center gap-3">
-          {/* PLAY BUTTON INTEGRATION */}
-          <PlayButton />
-          
           <button
             onClick={showShortcuts}
             className="p-2 bg-[#111] border border-[#333] hover:border-[#c5a059] transition-all btn-interactive"
@@ -1452,39 +1552,6 @@ const { user } = useAuth(); // Get user from useAuth instead
         className="main-interface relative z-10 max-w-7xl mx-auto p-4 md:p-8 crt-flicker"
         ref={containerRef}
       >
-        {/* CHARACTER PANEL */}
-        {selectedCharacter && (
-          <div className="character-panel mb-6 bg-[#111] border-2 border-[#c5a059] p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-gothic font-black text-2xl text-[#c5a059]">
-                  {selectedCharacter.name}
-                </h2>
-                <p className="font-tech text-xs text-zinc-400">
-                  {selectedCharacter.archetype} • {selectedCharacter.career} • XP: {selectedCharacter.xp}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  // Reset character selection
-                  window.location.reload();
-                }}
-                className="px-4 py-2 bg-red-900 border border-red-500 text-red-200 font-tech text-xs hover:bg-red-700 transition-all"
-              >
-                <X className="w-4 h-4 inline mr-1" /> CHANGE OPERATIVE
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* SKILLS MENU INTEGRATION */}
-        {selectedCharacter && (
-          <div className="mb-8">
-            <SkillsMenu />
-          </div>
-        )}
-
-        {/* MODE BUTTONS */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
           <button
             onClick={() => {
@@ -1593,7 +1660,6 @@ const { user } = useAuth(); // Get user from useAuth instead
           </button>
         </div>
 
-        {/* MAIN CONTENT GRID */}
         <div className="grid lg:grid-cols-4 gap-6">
           {/* LEFT COLUMN: CONTENT */}
           <div className="lg:col-span-3 min-h-[600px]">
@@ -1880,50 +1946,33 @@ const { user } = useAuth(); // Get user from useAuth instead
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <div className="bg-[#1a0505] border-2 border-red-900 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-[0_0_30px_rgba(255,0,0,0.1)] group">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
-                    <div className="purity-seal absolute top-2 left-2 text-[8px]">
-                      PURITY
-                    </div>
-                    <div className="purity-seal absolute bottom-2 right-2 text-[8px]">
-                      FAITH
-                    </div>
-                    <AlertTriangle className="w-10 h-10 text-red-600 mb-2 group-hover:animate-bounce btn-interactive" />
-                    <h3 className="text-red-500 font-gothic font-bold text-lg mb-1 tracking-widest uppercase">
-                      Ultimate Sanction
+                  <div className="bg-[#111] border-2 border-red-900 p-4">
+                    <h3 className="font-gothic font-bold text-red-500 mb-3">
+                      <AlertOctagon className="w-4 h-4 inline mr-2" /> PRIMARY
+                      TARGET
                     </h3>
-                    <p className="font-tech text-[10px] text-zinc-400 mb-3">
-                      Authorization: Lord Inquisitor Only
-                    </p>
-                    <button
-                      onClick={handleExterminatus}
-                      disabled={exterminatus || favor < 3}
-                      className="w-full py-3 bg-red-700 hover:bg-red-600 disabled:bg-gray-800 text-black font-black font-gothic tracking-[0.2em] border-2 border-red-400 shadow-[0_0_20px_rgba(255,0,0,0.6)] active:scale-95 transition-transform mt-2 relative overflow-hidden group btn-interactive"
-                    >
-                      <span className="relative z-10">
-                        {exterminatus ? 'ARMED...' : 'EXTERMINATUS'}
-                      </span>
-                      <div className="absolute inset-0 bg-red-500/50 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
-                      <div className="absolute inset-0 bg-red-500/30 translate-x-[100%] group-hover:translate-x-[-100%] transition-transform duration-500"></div>
-                    </button>
-                    {!exterminatus && favor < 3 && (
-                      <div className="mt-1 font-tech text-[9px] text-red-400 animate-pulse">
-                        <Sparkles className="w-3 h-3 inline mr-1" /> COST: 3 FAVOR
+                    <div className="font-tech text-[12px] text-red-400 space-y-1">
+                      <div className="font-gothic text-sm">
+                        DEMON PRINCE KOR'LAETH
                       </div>
-                    )}
-                    {exterminatus && (
-                      <div className="mt-2 font-tech text-[10px] text-red-400 animate-pulse">
-                        <Gauge className="w-3 h-3 inline mr-1" /> ARMAGEDDON PATTERN
-                        ACTIVATED
+                      <div className="text-[10px] text-zinc-400">
+                        Location: Hive Primus Cathedral
                       </div>
-                    )}
+                      <div className="flex gap-2 mt-2">
+                        <button className="flex-1 px-2 py-1 bg-red-900 border border-red-500 text-red-200 text-[9px] hover:bg-red-700 transition-all btn-interactive flex items-center justify-center gap-1">
+                          <Sword className="w-3 h-3" /> ENGAGE
+                        </button>
+                        <button className="px-2 py-1 bg-[#111] border border-[#333] text-zinc-400 text-[9px] hover:border-[#c5a059] transition-all btn-interactive">
+                          <Search className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* RIGHT COLUMN: SIDEBAR */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-[#111] border-2 border-[#5a2e2e] p-4 font-tech text-xs space-y-4">
               <div className="flex justify-between items-center">
@@ -2007,6 +2056,45 @@ const { user } = useAuth(); // Get user from useAuth instead
               setSatisfaction={setSatisfaction}
             />
 
+            <div className="bg-[#1a0505] border-2 border-red-900 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-[0_0_30px_rgba(255,0,0,0.1)] group">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10"></div>
+              <div className="purity-seal absolute top-2 left-2 text-[8px]">
+                PURITY
+              </div>
+              <div className="purity-seal absolute bottom-2 right-2 text-[8px]">
+                FAITH
+              </div>
+              <AlertTriangle className="w-10 h-10 text-red-600 mb-2 group-hover:animate-bounce btn-interactive" />
+              <h3 className="text-red-500 font-gothic font-bold text-lg mb-1 tracking-widest uppercase">
+                Ultimate Sanction
+              </h3>
+              <p className="font-tech text-[10px] text-zinc-400 mb-3">
+                Authorization: Lord Inquisitor Only
+              </p>
+              <button
+                onClick={handleExterminatus}
+                disabled={exterminatus || favor < 3}
+                className="w-full py-3 bg-red-700 hover:bg-red-600 disabled:bg-gray-800 text-black font-black font-gothic tracking-[0.2em] border-2 border-red-400 shadow-[0_0_20px_rgba(255,0,0,0.6)] active:scale-95 transition-transform mt-2 relative overflow-hidden group btn-interactive"
+              >
+                <span className="relative z-10">
+                  {exterminatus ? 'ARMED...' : 'EXTERMINATUS'}
+                </span>
+                <div className="absolute inset-0 bg-red-500/50 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                <div className="absolute inset-0 bg-red-500/30 translate-x-[100%] group-hover:translate-x-[-100%] transition-transform duration-500"></div>
+              </button>
+              {!exterminatus && favor < 3 && (
+                <div className="mt-1 font-tech text-[9px] text-red-400 animate-pulse">
+                  <Sparkles className="w-3 h-3 inline mr-1" /> COST: 3 FAVOR
+                </div>
+              )}
+              {exterminatus && (
+                <div className="mt-2 font-tech text-[10px] text-red-400 animate-pulse">
+                  <Gauge className="w-3 h-3 inline mr-1" /> ARMAGEDDON PATTERN
+                  ACTIVATED
+                </div>
+              )}
+            </div>
+
             {chaosLevel > 75 && (
               <div className="bg-purple-900/30 border-2 border-purple-700 p-4 animate-[pulse_1s_ease-in-out_infinite]">
                 <h3 className="font-gothic font-bold text-purple-400 mb-2 flex items-center gap-2">
@@ -2033,13 +2121,4 @@ const { user } = useAuth(); // Get user from useAuth instead
   );
 };
 
-// --- WRAPPER TO PREVENT WHITE SCREEN ---
-const DashboardWithProviders = (props) => {
-    return (
-        <AuthProvider>
-            <InquisitionDashboard {...props} />
-        </AuthProvider>
-    );
-};
-
-export default DashboardWithProviders;
+export default InquisitionDashboard;
