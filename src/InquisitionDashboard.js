@@ -1492,8 +1492,13 @@ const handleAdministratumRequest = () => {
           chaosLevel={chaosLevel}
         />
       )}
+// CHANGE TO (wrap in modal overlay):
 {showAdminRequest && (
-  <AdministratumRequest onClose={() => setShowAdminRequest(false)} />
+  <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="w-full max-w-7xl max-h-[90vh] overflow-auto">
+      <AdministratumRequest onClose={() => setShowAdminRequest(false)} />
+    </div>
+  </div>
 )}
       <header className="relative z-10 border-b-4 border-[#5a2e2e] bg-black/90 p-4 sticky top-0 shadow-2xl flex justify-between items-center main-interface crt-flicker">
         <div className="flex items-center gap-4">
