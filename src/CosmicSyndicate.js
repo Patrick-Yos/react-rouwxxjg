@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import DiceBox from '@3d-dice/dice-box';
 // Ensure you have a style.css file or remove this line if styling is handled via Tailwind//
-import './style.css'; 
+import './style.css';
 import {
   Sparkles,
   Zap,
@@ -36,6 +36,7 @@ import {
   Timer,
   XCircle,
   Dices,
+  Heart,
 } from 'lucide-react';
 
 // --- Loading reviews--
@@ -58,7 +59,7 @@ const saveReview = async (review) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(review),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       alert(error.error || 'Failed to save review');
@@ -68,6 +69,39 @@ const saveReview = async (review) => {
   } catch (error) {
     alert('Network error. Please try again.');
     return false;
+  }
+};
+
+// --- Loading donations --
+const loadDonations = async () => {
+  try {
+    const response = await fetch('/api/donations');
+    if (!response.ok) throw new Error('Failed');
+    return await response.json(); // Returns { donations: [...], total: number }
+  } catch (error) {
+    console.error('Error loading donations:', error);
+    return { donations: [], total: 0 };
+  }
+};
+
+// --- Saving donations --
+const saveDonation = async (donation) => {
+  try {
+    const response = await fetch('/api/donations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(donation),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      alert(error.error || 'Failed to save donation');
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    alert('Network error. Please try again.');
+    return null;
   }
 };
 // --- NEW COMPONENT: WARP SPEED BACKGROUND ---
@@ -124,9 +158,8 @@ const WarpSpeedBackground = () => {
         ctx.lineWidth = Math.min(r, 3);
         // Cyan to Purple gradient stroke depending on depth
         const alpha = 1 - this.z / width;
-        ctx.strokeStyle = `rgba(${
-          100 + (255 - this.z / 4)
-        }, ${200}, ${255}, ${alpha})`;
+        ctx.strokeStyle = `rgba(${100 + (255 - this.z / 4)
+          }, ${200}, ${255}, ${alpha})`;
         ctx.stroke();
       }
     }
@@ -410,11 +443,10 @@ const ArcadeOverlay = ({ onClose }) => {
                       <button
                         key={index}
                         onClick={() => handleCardClick(index)}
-                        className={`w-16 h-16 md:w-24 md:h-24 rounded-xl transition-all duration-300 transform ${
-                          isFlipped
-                            ? 'bg-gradient-to-br from-pink-600 to-purple-600 rotate-y-180'
-                            : 'bg-indigo-900/80 border-2 border-indigo-500/50 hover:border-indigo-400'
-                        } flex items-center justify-center`}
+                        className={`w-16 h-16 md:w-24 md:h-24 rounded-xl transition-all duration-300 transform ${isFlipped
+                          ? 'bg-gradient-to-br from-pink-600 to-purple-600 rotate-y-180'
+                          : 'bg-indigo-900/80 border-2 border-indigo-500/50 hover:border-indigo-400'
+                          } flex items-center justify-center`}
                       >
                         {isFlipped ? (
                           <CardIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
@@ -443,14 +475,14 @@ const ArcadeOverlay = ({ onClose }) => {
 // --- DICE COMPONENT ---
 const DiceRoller = ({ onClose }) => {
   const [status, setStatus] = useState('Initializing...');
-  const [pool, setPool] = useState([]); 
+  const [pool, setPool] = useState([]);
   const [customSides, setCustomSides] = useState('');
   const [rolling, setRolling] = useState(false);
-  const [totalResult, setTotalResult] = useState(0); 
+  const [totalResult, setTotalResult] = useState(0);
   const [resultDetails, setResultDetails] = useState([]);
-  
+
   // FIX: This ID must NOT have the hash when used in HTML
-  const containerId = 'dice-box-element'; 
+  const containerId = 'dice-box-element';
   const diceBoxRef = useRef(null);
   const initialized = useRef(false);
 
@@ -462,14 +494,14 @@ const DiceRoller = ({ onClose }) => {
       // 1. Create Box
       const Box = new DiceBox({
         // FIX: The library requires the selector with the hash
-        id:'#'+containerId, 
+        id: '#' + containerId,
         assetPath: 'assets/',
         origin: 'https://unpkg.com/@3d-dice/dice-box@1.1.4/dist/',
         theme: 'default',
         scale: 6,
-        themeColor: '#00e5ff', 
+        themeColor: '#00e5ff',
         debug: false,
-       // offscreen: true // Optimization
+        // offscreen: true // Optimization
       });
 
       diceBoxRef.current = Box;
@@ -477,10 +509,10 @@ const DiceRoller = ({ onClose }) => {
       try {
         setStatus('Loading Physics...');
         await Box.init();
-        
+
         // Force resize to fill the container we created
         Box.resizeWorld();
-        
+
         setStatus('Ready');
       } catch (e) {
         console.error(e);
@@ -489,7 +521,7 @@ const DiceRoller = ({ onClose }) => {
     };
 
     setTimeout(initBox, 100);
-    
+
     return () => { initialized.current = false; };
   }, []);
 
@@ -515,7 +547,7 @@ const DiceRoller = ({ onClose }) => {
     }
   };
 
-    const handleClose = () => {
+  const handleClose = () => {
     if (!rolling) {
       handleClear(); // Clear the board first
       onClose();     // Then close the widget
@@ -543,17 +575,17 @@ const DiceRoller = ({ onClose }) => {
       let details = [];
 
       const rolls = Array.isArray(result) ? result : [result];
-      
+
       rolls.forEach(r => {
         if (r.rolls) {
-             r.rolls.forEach(sub => {
-                 total += sub.value;
-                 details.push({ type: `d${r.sides}`, value: sub.value });
-             });
+          r.rolls.forEach(sub => {
+            total += sub.value;
+            details.push({ type: `d${r.sides}`, value: sub.value });
+          });
         } else {
-             const val = r.value || r.total || 0;
-             total += val;
-             details.push({ type: `d${r.sides}`, value: val });
+          const val = r.value || r.total || 0;
+          total += val;
+          details.push({ type: `d${r.sides}`, value: val });
         }
       });
 
@@ -562,9 +594,9 @@ const DiceRoller = ({ onClose }) => {
       setStatus('Ready');
       setRolling(false);
     }).catch(e => {
-        setStatus('Error');
-        console.error(e);
-        setRolling(false);
+      setStatus('Error');
+      console.error(e);
+      setRolling(false);
     });
   };
 
@@ -581,17 +613,17 @@ const DiceRoller = ({ onClose }) => {
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 200, pointerEvents: 'none' }}>
-      
+
       {/* 1. CLICK TO CLOSE BG */}
-      <div 
+      <div
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto', zIndex: 1 }}
         onClick={(e) => { if (!rolling) onClose(); }}
-        
+
       ></div>
 
       {/* 2. DICE CONTAINER - ID matches init (without hash) */}
-      <div 
-        id={containerId} 
+      <div
+        id={containerId}
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 5 }}
       ></div>
 
@@ -611,97 +643,97 @@ const DiceRoller = ({ onClose }) => {
 
       {/* 4. UI FOREGROUND */}
       <div className="absolute bottom-0 w-full flex flex-col items-center justify-end p-4 pb-8 pointer-events-auto" style={{ zIndex: 1000 }}>
-        
+
         {/* RESULT DISPLAY */}
         <div className="mb-6 bg-black/80 backdrop-blur-xl border-2 border-cyan-500 p-6 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.5)] flex flex-col items-center min-w-[200px]">
-            <div className="text-cyan-400 font-bold text-xs mb-1">TOTAL</div>
-            <div className="text-7xl font-black text-white drop-shadow-sm">
-                {rolling ? '...' : totalResult}
+          <div className="text-cyan-400 font-bold text-xs mb-1">TOTAL</div>
+          <div className="text-7xl font-black text-white drop-shadow-sm">
+            {rolling ? '...' : totalResult}
+          </div>
+          {/* Show individual numbers if available */}
+          {resultDetails.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
+              {resultDetails.map((d, i) => (
+                <span key={i} className="text-xs bg-white/20 px-2 py-1 rounded text-cyan-100">
+                  {d.type}: {d.value}
+                </span>
+              ))}
             </div>
-            {/* Show individual numbers if available */}
-            {resultDetails.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-md">
-                    {resultDetails.map((d, i) => (
-                        <span key={i} className="text-xs bg-white/20 px-2 py-1 rounded text-cyan-100">
-                            {d.type}: {d.value}
-                        </span>
-                    ))}
-                </div>
-            )}
+          )}
         </div>
 
         {/* CONTROLS */}
         <div className="bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-4 w-full max-w-3xl">
-            
-            {/* Header / Pool */}
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                <div className="flex items-center gap-2 overflow-x-auto">
-                   <Dices className="text-cyan-400 w-5 h-5 flex-shrink-0" />
-                   {pool.length === 0 ? (
-                     <span className="text-gray-500 italic text-sm">Tap dice to add...</span>
-                   ) : (
-                     <div className="flex gap-1">
-                        {/* Display condensed pool */}
-                        {Object.entries(pool.reduce((acc, curr) => { acc[curr] = (acc[curr] || 0) + 1; return acc; }, {})).map(([die, count]) => (
-                            <span key={die} className="px-2 py-0.5 bg-purple-900/50 border border-purple-500/50 rounded text-xs text-purple-200 font-mono whitespace-nowrap">
-                                {count}{die}
-                            </span>
-                        ))}
-                     </div>
-                   )}
+
+          {/* Header / Pool */}
+          <div className="flex justify-between items-center border-b border-white/10 pb-2">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <Dices className="text-cyan-400 w-5 h-5 flex-shrink-0" />
+              {pool.length === 0 ? (
+                <span className="text-gray-500 italic text-sm">Tap dice to add...</span>
+              ) : (
+                <div className="flex gap-1">
+                  {/* Display condensed pool */}
+                  {Object.entries(pool.reduce((acc, curr) => { acc[curr] = (acc[curr] || 0) + 1; return acc; }, {})).map(([die, count]) => (
+                    <span key={die} className="px-2 py-0.5 bg-purple-900/50 border border-purple-500/50 rounded text-xs text-purple-200 font-mono whitespace-nowrap">
+                      {count}{die}
+                    </span>
+                  ))}
                 </div>
-                <button onClick={handleClose} className="text-gray-400 hover:text-white"><XCircle /></button>
+              )}
             </div>
+            <button onClick={handleClose} className="text-gray-400 hover:text-white"><XCircle /></button>
+          </div>
 
-            {/* BUTTONS */}
-            <div className="flex flex-wrap justify-center gap-2">
-                {diceOptions.map((opt) => (
-                    <button
-                        key={opt.type}
-                        onClick={() => addToPool(opt.type)}
-                        disabled={status !== 'Ready' || rolling}
-                        className="w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:bg-cyan-900/50 hover:border-cyan-400 transition-all font-bold text-cyan-100 text-sm"
-                    >
-                        {opt.label}
-                    </button>
-                ))}
-                
-                {/* Custom Input */}
-                <form onSubmit={addCustomDie} className="flex items-center h-14 bg-black/50 rounded-xl border border-cyan-500/30 overflow-hidden">
-                    <span className="pl-3 text-cyan-500 font-mono text-sm">d</span>
-                    <input 
-                        type="number" 
-                        min="1"
-                        placeholder="?"
-                        value={customSides}
-                        onChange={(e) => setCustomSides(e.target.value)}
-                        className="w-12 h-full bg-transparent text-white p-2 outline-none font-bold text-center"
-                    />
-                    <button type="submit" className="h-full px-3 hover:bg-cyan-900/50 text-cyan-400 border-l border-cyan-500/30">
-                        <Plus className="w-4 h-4" />
-                    </button>
-                </form>
-            </div>
+          {/* BUTTONS */}
+          <div className="flex flex-wrap justify-center gap-2">
+            {diceOptions.map((opt) => (
+              <button
+                key={opt.type}
+                onClick={() => addToPool(opt.type)}
+                disabled={status !== 'Ready' || rolling}
+                className="w-14 h-14 bg-black/50 rounded-xl border border-cyan-500/30 hover:bg-cyan-900/50 hover:border-cyan-400 transition-all font-bold text-cyan-100 text-sm"
+              >
+                {opt.label}
+              </button>
+            ))}
 
-            {/* ACTION BUTTONS */}
-            <div className="grid grid-cols-4 gap-3 mt-2">
-                <button 
-                    onClick={handleClear}
-                    disabled={rolling}
-                    className="col-span-1 py-3 rounded-xl bg-red-900/30 border border-red-500/30 text-red-400 hover:bg-red-900/50 font-bold"
-                >
-                    CLEAR
-                </button>
-                <button
-                    onClick={handleRoll}
-                    disabled={pool.length === 0 || rolling || status !== 'Ready'}
-                    className="col-span-3 py-3 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-bold text-white text-lg hover:from-cyan-500 hover:to-purple-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                    {rolling ? 'ROLLING...' : 'ROLL DICE'}
-                </button>
-            </div>
-            
-            <div className="text-center text-xs text-cyan-500/50 mt-1">Status: {status}</div>
+            {/* Custom Input */}
+            <form onSubmit={addCustomDie} className="flex items-center h-14 bg-black/50 rounded-xl border border-cyan-500/30 overflow-hidden">
+              <span className="pl-3 text-cyan-500 font-mono text-sm">d</span>
+              <input
+                type="number"
+                min="1"
+                placeholder="?"
+                value={customSides}
+                onChange={(e) => setCustomSides(e.target.value)}
+                className="w-12 h-full bg-transparent text-white p-2 outline-none font-bold text-center"
+              />
+              <button type="submit" className="h-full px-3 hover:bg-cyan-900/50 text-cyan-400 border-l border-cyan-500/30">
+                <Plus className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+
+          {/* ACTION BUTTONS */}
+          <div className="grid grid-cols-4 gap-3 mt-2">
+            <button
+              onClick={handleClear}
+              disabled={rolling}
+              className="col-span-1 py-3 rounded-xl bg-red-900/30 border border-red-500/30 text-red-400 hover:bg-red-900/50 font-bold"
+            >
+              CLEAR
+            </button>
+            <button
+              onClick={handleRoll}
+              disabled={pool.length === 0 || rolling || status !== 'Ready'}
+              className="col-span-3 py-3 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-xl font-bold text-white text-lg hover:from-cyan-500 hover:to-purple-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {rolling ? 'ROLLING...' : 'ROLL DICE'}
+            </button>
+          </div>
+
+          <div className="text-center text-xs text-cyan-500/50 mt-1">Status: {status}</div>
         </div>
       </div>
     </div>
@@ -731,9 +763,9 @@ const LoginOverlay = ({ onClose, onLogin }) => {
 
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      localStorage.setItem('cosmicToken',  data.token);
+      localStorage.setItem('cosmicToken', data.token);
       localStorage.setItem('cosmicUser', JSON.stringify(data.user));
-      
+
       onLogin(data.user);
       onClose();
     } catch (err) {
@@ -749,7 +781,7 @@ const LoginOverlay = ({ onClose, onLogin }) => {
         <button onClick={onClose} className="absolute top-4 right-4 p-2 text-cyan-400 hover:text-cyan-300">
           <X className="w-6 h-6" />
         </button>
-        
+
         <div className="text-center space-y-4 mb-8">
           <Sparkles className="w-12 h-12 text-cyan-400 mx-auto animate-pulse" />
           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300">
@@ -761,21 +793,21 @@ const LoginOverlay = ({ onClose, onLogin }) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-cyan-300 font-semibold mb-2">Username</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} 
-              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors" 
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors"
               placeholder="Enter username..." required disabled={loading} />
           </div>
 
           <div>
             <label className="block text-cyan-300 font-semibold mb-2">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} 
-              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors" 
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-black/40 border-2 border-cyan-400/40 rounded-lg text-cyan-100 placeholder-cyan-400/50 focus:border-cyan-400 focus:outline-none transition-colors"
               placeholder="Enter password..." required disabled={loading} />
           </div>
 
           {error && <div className="p-3 bg-red-900/40 border border-red-400/50 rounded-lg text-red-300 text-sm">{error}</div>}
 
-          <button type="submit" disabled={loading} 
+          <button type="submit" disabled={loading}
             className="w-full py-4 px-6 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold text-lg rounded-lg transition-all duration-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] disabled:opacity-50">
             {loading ? 'LOGGING IN...' : 'ENTER THE COSMOS'}
           </button>
@@ -821,7 +853,7 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
     };
 
     loadMessages();
-    
+
     // Poll for new messages every 3 seconds
     const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
@@ -834,7 +866,7 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
 
   const handleSend = async () => {
     if (!newMessage.trim() || !currentUser) return;
-    
+
     try {
       await fetch('/api/chat-messages', {
         method: 'POST',
@@ -844,9 +876,9 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
           text: newMessage.trim()
         })
       });
-      
+
       setNewMessage('');
-      
+
       // Refresh messages immediately
       const response = await fetch('/api/chat-messages');
       const data = await response.json();
@@ -899,17 +931,17 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
       </div>
 
       <div className="p-3 border-t border-green-400/30 flex gap-2">
-        <input 
-          type="text" 
-          value={newMessage} 
-          onChange={(e) => setNewMessage(e.target.value)} 
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Type your message..."
-          className="flex-1 px-3 py-2 bg-slate-800/60 border border-green-400/30 rounded-lg text-slate-100 placeholder-slate-400 focus:border-green-400 focus:outline-none transition-colors text-sm" 
+          className="flex-1 px-3 py-2 bg-slate-800/60 border border-green-400/30 rounded-lg text-slate-100 placeholder-slate-400 focus:border-green-400 focus:outline-none transition-colors text-sm"
         />
-        <button 
-          onClick={handleSend} 
-          disabled={!newMessage.trim()} 
+        <button
+          onClick={handleSend}
+          disabled={!newMessage.trim()}
           className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:opacity-50 rounded-lg text-white transition-colors"
         >
           <span className="font-bold">Send</span>
@@ -926,8 +958,8 @@ const ChatWindow = ({ isOpen, onClose, currentUser }) => {
 
 // --- DND CHAT BUBBLE ---
 const DndChatBubble = ({ onToggle, hasNewResponse }) => (
-  <button 
-    onClick={onToggle} 
+  <button
+    onClick={onToggle}
     className="fixed bottom-28 right-8 z-[155] p-3 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full border-2 border-violet-400 shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:shadow-[0_0_35px_rgba(139,92,246,0.7)] transition-all duration-300 transform hover:scale-110"
   >
     <Book className="w-5 h-5 text-white" />
@@ -951,17 +983,17 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
 
   const handleSend = async () => {
     if (!newMessage.trim() || !currentUser) return;
-    
-    const userMsg = { 
-      id: Date.now(), 
-      username: currentUser.username, 
+
+    const userMsg = {
+      id: Date.now(),
+      username: currentUser.username,
       text: newMessage.trim(),
-      isUser: true 
+      isUser: true
     };
-    
+
     setMessages(prev => [...prev, userMsg]);
     setIsStreaming(true);
-    
+
     try {
       const response = await fetch('/api/dnd-chat', {
         method: 'POST',
@@ -970,13 +1002,13 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
       });
 
       setNewMessage('');
-      
+
       // Add assistant message placeholder
-      const assistantMsg = { 
-        id: Date.now() + 1, 
-        username: 'D&D Assistant', 
+      const assistantMsg = {
+        id: Date.now() + 1,
+        username: 'D&D Assistant',
         text: '',
-        isUser: false 
+        isUser: false
       };
       setMessages(prev => [...prev, assistantMsg]);
 
@@ -988,17 +1020,17 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         fullText += chunk;
-        
+
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1].text = fullText;
           return newMessages;
         });
       }
-      
+
     } catch (error) {
       setMessages(prev => [...prev, {
         id: Date.now(),
@@ -1041,14 +1073,13 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
             <p className="text-xs mt-2 text-violet-400">I'll search the campaign document</p>
           </div>
         )}
-        
+
         {messages.map(msg => (
           <div key={msg.id} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs px-3 py-2 rounded-lg ${
-              msg.isUser 
-                ? 'bg-violet-600 text-white' 
-                : 'bg-purple-800/60 text-violet-100 border border-violet-500/30'
-            }`}>
+            <div className={`max-w-xs px-3 py-2 rounded-lg ${msg.isUser
+              ? 'bg-violet-600 text-white'
+              : 'bg-purple-800/60 text-violet-100 border border-violet-500/30'
+              }`}>
               {!msg.isUser && (
                 <div className="text-xs opacity-70 mb-1 font-semibold">
                   {msg.username}
@@ -1058,7 +1089,7 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
             </div>
           </div>
         ))}
-        
+
         {isStreaming && (
           <div className="flex justify-start">
             <div className="px-3 py-2 rounded-lg bg-purple-800/60 text-violet-100 border border-violet-500/30">
@@ -1070,13 +1101,13 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
       <div className="p-3 border-t border-violet-400/30 flex gap-2">
-        <input 
+        <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
@@ -1085,7 +1116,7 @@ const DndChatWindow = ({ isOpen, onClose, currentUser }) => {
           className="flex-1 px-3 py-2 bg-purple-800/60 border border-violet-400/30 rounded-lg text-violet-100 placeholder-violet-400 focus:border-violet-400 focus:outline-none transition-colors text-sm"
           disabled={isStreaming}
         />
-        <button 
+        <button
           onClick={handleSend}
           disabled={!newMessage.trim() || isStreaming}
           className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:opacity-50 rounded-lg text-white transition-colors"
@@ -1104,18 +1135,43 @@ const CosmicSyndicate = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
-const [reviews, setReviews] = useState([]);
+  const [reviews, setReviews] = useState([]);
   useEffect(() => {
     loadReviews().then(setReviews);
-    }, []);
-  
+  }, []);
+
   const [newReview, setNewReview] = useState({
     name: '',
     rating: 5,
     comment: '',
   });
 
-  
+  // DJ Smooch.exe GoFundMe state
+  const [donations, setDonations] = useState([]);
+  const [donationTotal, setDonationTotal] = useState(0);
+  const [newDonation, setNewDonation] = useState({
+    name: '',
+    amount: 100,
+    message: '',
+  });
+  const [showDonationCheckout, setShowDonationCheckout] = useState(false);
+  const [showDonationSuccess, setShowDonationSuccess] = useState(false);
+  const [donationPaymentForm, setDonationPaymentForm] = useState({
+    cardNumber: '',
+    fullName: '',
+    expiryDate: '',
+    cvv: '',
+  });
+
+  // Load donations on mount
+  useEffect(() => {
+    loadDonations().then(data => {
+      setDonations(data.donations || []);
+      setDonationTotal(data.total || 0);
+    });
+  }, []);
+
+
   // Login and current user
   const [showLogin, setShowLogin] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -1164,38 +1220,38 @@ const [reviews, setReviews] = useState([]);
   const mountRef = useRef(null);
 
   // Users-Check for existing session on mount
-useEffect(() => {
-  const token = localStorage.getItem('cosmicToken');
-  const user = localStorage.getItem('cosmicUser');
-  
-  if (token && user) {
-    fetch('/api/auth', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => {
-        if (res.ok) {
-          setCurrentUser(JSON.parse(user));
-        } else {
-          localStorage.removeItem('cosmicToken');
-          localStorage.removeItem('cosmicUser');
-        }
-      });
-  }
-}, []);
+  useEffect(() => {
+    const token = localStorage.getItem('cosmicToken');
+    const user = localStorage.getItem('cosmicUser');
 
-// Update unread count
-useEffect(() => {
-  if (!chatOpen && currentUser) {
-    const messages = JSON.parse(localStorage.getItem('cosmicChatMessages') || '[]');
-    const lastRead = localStorage.getItem('cosmicChatLastRead');
-    const unread = lastRead 
-      ? messages.filter(m => m.username !== currentUser.username && new Date(m.timestamp) > new Date(lastRead)).length
-      : messages.filter(m => m.username !== currentUser.username).length;
-    setUnreadCount(unread);
-  } else {
-    setUnreadCount(0);
-    localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
-  }
+    if (token && user) {
+      fetch('/api/auth', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => {
+          if (res.ok) {
+            setCurrentUser(JSON.parse(user));
+          } else {
+            localStorage.removeItem('cosmicToken');
+            localStorage.removeItem('cosmicUser');
+          }
+        });
+    }
+  }, []);
+
+  // Update unread count
+  useEffect(() => {
+    if (!chatOpen && currentUser) {
+      const messages = JSON.parse(localStorage.getItem('cosmicChatMessages') || '[]');
+      const lastRead = localStorage.getItem('cosmicChatLastRead');
+      const unread = lastRead
+        ? messages.filter(m => m.username !== currentUser.username && new Date(m.timestamp) > new Date(lastRead)).length
+        : messages.filter(m => m.username !== currentUser.username).length;
+      setUnreadCount(unread);
+    } else {
+      setUnreadCount(0);
+      localStorage.setItem('cosmicChatLastRead', new Date().toISOString());
+    }
   }, [chatOpen, currentUser]);
 
   // Mouse Options
@@ -1606,19 +1662,19 @@ useEffect(() => {
 
     loadThreeJS();
   }, [showOperations]);
-  
+
   /// Handle users longin
   const handleLogin = (user) => {
     setCurrentUser(user);
   };
-  
+
   const handleLogout = () => {
     localStorage.removeItem('cosmicToken');
     localStorage.removeItem('cosmicUser');
     setCurrentUser(null);
     setChatOpen(false);
   };
-  
+
   // --- STANDARD FUNCTIONS ---
   const scrollToSection = (section) => {
     setActiveSection(section);
@@ -1670,66 +1726,65 @@ useEffect(() => {
     return [...Array(5)].map((_, i) => (
       <Star
         key={i}
-        className={`w-5 h-5 ${
-          i < Math.round(rating)
-            ? 'text-yellow-400 fill-yellow-400'
-            : 'text-gray-600'
-        }`}
+        className={`w-5 h-5 ${i < Math.round(rating)
+          ? 'text-yellow-400 fill-yellow-400'
+          : 'text-gray-600'
+          }`}
       />
     ));
   };
-// Average constant
+  // Average constant
   const averageRating =
-  reviews.length > 0
-    ? reviews.reduce((sum, r) => sum + parseFloat(r.rating), 0) /
+    reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + parseFloat(r.rating), 0) /
       reviews.length
-    : 0;
+      : 0;
 
 
 
-  
-const submitReview = async (e) => {
-  e.preventDefault();
-  if (!newReview.name || !newReview.comment) return;
 
-  const today = new Date();
-  const formattedDate = today.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (!newReview.name || !newReview.comment) return;
 
-  // Send data WITHOUT id
-  const reviewData = {
-    name: newReview.name,
-    rating: newReview.rating,
-    comment: newReview.comment,
-    date: `Cosmic Year ${formattedDate}`
-  };
-
-  try {
-    const response = await fetch('/api/reviews', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reviewData),
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
 
-    const result = await response.json();
+    // Send data WITHOUT id
+    const reviewData = {
+      name: newReview.name,
+      rating: newReview.rating,
+      comment: newReview.comment,
+      date: `Cosmic Year ${formattedDate}`
+    };
 
-    if (!response.ok) {
-      alert(result.error || 'Failed to save');
-      return;
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Failed to save');
+        return;
+      }
+
+      // Use the ID returned from database
+      setReviews(prev => [...prev, { ...reviewData, id: result.id }]);
+      setNewReview({ name: '', rating: 5, comment: '' });
+
+    } catch (error) {
+      console.error('Network error:', error);
+      alert('Network error. Please try again.');
     }
-
-    // Use the ID returned from database
-    setReviews(prev => [...prev, { ...reviewData, id: result.id }]);
-    setNewReview({ name: '', rating: 5, comment: '' });
-
-  } catch (error) {
-    console.error('Network error:', error);
-    alert('Network error. Please try again.');
-  }
-};
+  };
   const handleCheckout = () => {
     if (cart.length === 0) return;
     document.getElementById('cart-drawer')?.classList.add('translate-x-full');
@@ -1795,11 +1850,10 @@ const submitReview = async (e) => {
   const MenuItem = ({ icon: Icon, text, section }) => (
     <button
       onClick={() => scrollToSection(section)}
-      className={`group relative px-6 py-3 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-cyan-400/50 rounded-lg backdrop-blur-sm hover:border-cyan-300 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)] transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 ${
-        activeSection === section
-          ? 'border-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.6)]'
-          : ''
-      }`}
+      className={`group relative px-6 py-3 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-2 border-cyan-400/50 rounded-lg backdrop-blur-sm hover:border-cyan-300 hover:shadow-[0_0_30px_rgba(34,211,238,0.6)] transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 ${activeSection === section
+        ? 'border-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.6)]'
+        : ''
+        }`}
     >
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
@@ -1875,36 +1929,36 @@ const submitReview = async (e) => {
       {showDiceRoller && (
         <DiceRoller onClose={() => setShowDiceRoller(false)} />
       )}
-      {/*Login OVERLAY */}     
-      {showLogin && <LoginOverlay onClose={() => setShowLogin(false)} onLogin={handleLogin} />}    
+      {/*Login OVERLAY */}
+      {showLogin && <LoginOverlay onClose={() => setShowLogin(false)} onLogin={handleLogin} />}
 
-      {/*Chat OVERLAY */}     
+      {/*Chat OVERLAY */}
 
       {/* Chat Components - Only show for logged in users */}
       {currentUser && (
         <>
           {/* Cosmic Chat */}
-          <ChatBubble 
-            onToggle={() => setChatOpen(!chatOpen)} 
-            unreadCount={unreadCount} 
+          <ChatBubble
+            onToggle={() => setChatOpen(!chatOpen)}
+            unreadCount={unreadCount}
           />
-          <ChatWindow 
-            isOpen={chatOpen} 
-            onClose={() => setChatOpen(false)} 
-            currentUser={currentUser} 
+          <ChatWindow
+            isOpen={chatOpen}
+            onClose={() => setChatOpen(false)}
+            currentUser={currentUser}
           />
-          
+
           {/* D&D Assistant Chat - New! */}
-          <DndChatBubble 
+          <DndChatBubble
             onToggle={() => {
               setDndChatOpen(!dndChatOpen);
               setDndHasNewResponse(false);
-            }} 
+            }}
             hasNewResponse={dndHasNewResponse}
           />
-          <DndChatWindow 
-            isOpen={dndChatOpen} 
-            onClose={() => setDndChatOpen(false)} 
+          <DndChatWindow
+            isOpen={dndChatOpen}
+            onClose={() => setDndChatOpen(false)}
             currentUser={currentUser}
           />
         </>
@@ -2072,6 +2126,213 @@ const submitReview = async (e) => {
         </div>
       )}
 
+      {/* Donation Checkout Page Overlay */}
+      {showDonationCheckout && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto">
+          <div className="min-h-screen py-20 px-4">
+            <div className="max-w-3xl mx-auto">
+              {!showDonationSuccess ? (
+                <div className="relative p-12 bg-gradient-to-br from-rose-900/60 to-pink-900/60 rounded-3xl border-2 border-rose-400/50 backdrop-blur-lg shadow-[0_0_80px_rgba(244,63,94,0.6)]">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 rounded-3xl opacity-30 blur-2xl animate-pulse" />
+                  <div className="relative space-y-8">
+                    <button
+                      onClick={() => setShowDonationCheckout(false)}
+                      className="absolute top-0 right-0 p-2 text-rose-400 hover:text-rose-300 transition-colors"
+                    >
+                      <X className="w-8 h-8" />
+                    </button>
+                    <div className="text-center space-y-4">
+                      <div className="flex justify-center">
+                        <Heart className="w-16 h-16 text-rose-400 animate-pulse" />
+                      </div>
+                      <h2 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+                        DJ SMOOCH.EXE MEMORIAL DONATION
+                      </h2>
+                      <p className="text-xl text-rose-200 italic">
+                        Every cosmic credit keeps his legacy alive
+                      </p>
+                    </div>
+                    <div className="p-6 bg-black/40 rounded-xl border border-rose-400/30 space-y-3">
+                      <div className="flex justify-between items-center text-xl">
+                        <span className="text-rose-300 font-bold">
+                          Donor:
+                        </span>
+                        <span className="text-white font-black text-xl">
+                          {newDonation.name}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xl">
+                        <span className="text-rose-300 font-bold">
+                          Donation Amount:
+                        </span>
+                        <span className="text-rose-200 font-black text-3xl">
+                          {newDonation.amount.toLocaleString()} ◈
+                        </span>
+                      </div>
+                      {newDonation.message && (
+                        <div className="pt-2 border-t border-rose-400/30">
+                          <span className="text-rose-300 font-bold">Message: </span>
+                          <span className="text-rose-100 italic">"{newDonation.message}"</span>
+                        </div>
+                      )}
+                    </div>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+
+                      const today = new Date();
+                      const formattedDate = today.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      });
+
+                      const donationData = {
+                        name: newDonation.name,
+                        amount: newDonation.amount,
+                        message: newDonation.message,
+                        date: `Cosmic Year ${formattedDate}`
+                      };
+
+                      const result = await saveDonation(donationData);
+
+                      if (result) {
+                        setDonations(prev => [{ ...donationData, id: result.id }, ...prev]);
+                        setDonationTotal(result.newTotal);
+                        setShowDonationSuccess(true);
+
+                        setTimeout(() => {
+                          setShowDonationCheckout(false);
+                          setShowDonationSuccess(false);
+                          setNewDonation({ name: '', amount: 100, message: '' });
+                          setDonationPaymentForm({ cardNumber: '', fullName: '', expiryDate: '', cvv: '' });
+                        }, 5000);
+                      }
+                    }} className="space-y-6">
+                      <div>
+                        <label className="block text-rose-300 font-semibold mb-2 text-lg">
+                          Bank Card ID / Card Number
+                        </label>
+                        <input
+                          type="text"
+                          value={donationPaymentForm.cardNumber}
+                          onChange={(e) =>
+                            setDonationPaymentForm({
+                              ...donationPaymentForm,
+                              cardNumber: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors text-lg font-mono"
+                          placeholder="1234 5678 9012 3456"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-rose-300 font-semibold mb-2 text-lg">
+                          Full Name on Card
+                        </label>
+                        <input
+                          type="text"
+                          value={donationPaymentForm.fullName}
+                          onChange={(e) =>
+                            setDonationPaymentForm({
+                              ...donationPaymentForm,
+                              fullName: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors text-lg"
+                          placeholder="COSMIC PATRON"
+                          required
+                        />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-rose-300 font-semibold mb-2 text-lg">
+                            Expiry Date
+                          </label>
+                          <input
+                            type="text"
+                            value={donationPaymentForm.expiryDate}
+                            onChange={(e) =>
+                              setDonationPaymentForm({
+                                ...donationPaymentForm,
+                                expiryDate: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors text-lg font-mono"
+                            placeholder="MM/YY"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-rose-300 font-semibold mb-2 text-lg">
+                            Security Code (CVV)
+                          </label>
+                          <input
+                            type="text"
+                            value={donationPaymentForm.cvv}
+                            onChange={(e) =>
+                              setDonationPaymentForm({
+                                ...donationPaymentForm,
+                                cvv: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors text-lg font-mono"
+                            placeholder="***"
+                            maxLength="3"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-5 px-8 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-black text-2xl rounded-xl transition-all duration-300 shadow-[0_0_40px_rgba(244,63,94,0.5)] hover:shadow-[0_0_60px_rgba(244,63,94,0.8)] transform hover:scale-105 border-2 border-rose-400/50"
+                      >
+                        <div className="flex items-center justify-center gap-3">
+                          <Heart className="w-8 h-8" /> COMPLETE DONATION{' '}
+                          <Heart className="w-8 h-8" />
+                        </div>
+                      </button>
+                    </form>
+                    <div className="text-center text-sm text-rose-400 italic space-y-1">
+                      <p>🎧 DJ Smooch.exe watches over every transaction 🎧</p>
+                      <p>💔 His beats may have stopped, but his spirit lives on 💔</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative p-12 bg-gradient-to-br from-rose-900/60 to-pink-900/60 rounded-3xl border-2 border-rose-400/50 backdrop-blur-lg shadow-[0_0_80px_rgba(244,63,94,0.6)] animate-pulse">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 rounded-3xl opacity-30 blur-2xl animate-pulse" />
+                  <div className="relative text-center space-y-6">
+                    <div className="flex justify-center">
+                      <Heart className="w-24 h-24 text-rose-400 animate-bounce" />
+                    </div>
+                    <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+                      YOUR DONATION HAS BEEN RECEIVED! 🎧💖
+                    </h2>
+                    <div className="space-y-4 text-xl text-rose-100">
+                      <p className="font-bold text-2xl">
+                        ✨ Thank you for honoring DJ Smooch.exe's memory! ✨
+                      </p>
+                      <p className="italic">
+                        Your {newDonation.amount.toLocaleString()} ◈ is being processed through cosmic channels...
+                      </p>
+                      <p className="text-rose-300 font-semibold text-2xl animate-pulse">
+                        His beats will echo forever! 🎵🚀💫
+                      </p>
+                    </div>
+                    <div className="flex justify-center gap-4 pt-4">
+                      <Music className="w-8 h-8 text-rose-400 animate-spin" />
+                      <Heart className="w-8 h-8 text-pink-400 animate-pulse" />
+                      <Music className="w-8 h-8 text-rose-400 animate-spin" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Area of Operations - Solar System */}
       {showOperations && (
         // Added z-[100] to fix overlap with nav
@@ -2091,11 +2352,10 @@ const submitReview = async (e) => {
 
             <button
               onClick={togglePause}
-              className={`px-6 py-3 font-bold rounded-lg border-2 flex items-center justify-center gap-2 transition-all transform hover:scale-105 ${
-                isPaused
-                  ? 'bg-yellow-600/90 hover:bg-yellow-500 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)]'
-                  : 'bg-green-600/90 hover:bg-green-500 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
-              }`}
+              className={`px-6 py-3 font-bold rounded-lg border-2 flex items-center justify-center gap-2 transition-all transform hover:scale-105 ${isPaused
+                ? 'bg-yellow-600/90 hover:bg-yellow-500 border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)]'
+                : 'bg-green-600/90 hover:bg-green-500 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
+                }`}
             >
               {isPaused ? (
                 <Play className="w-5 h-5" />
@@ -2515,13 +2775,14 @@ const submitReview = async (e) => {
               COSMIC SYNDICATE
             </span>
           </div>
-            <div className="hidden lg:flex lg:flex-wrap gap-3">
+          <div className="hidden lg:flex lg:flex-wrap gap-3">
             <MenuItem icon={Users} text="Our Team" section="team" />
             <MenuItem icon={Target} text="Mission & Vision" section="mission" />
             <MenuItem icon={Trophy} text="Success Stories" section="stories" />
             <MenuItem icon={Church} text="The Church" section="church" />
             <MenuItem icon={ShoppingBag} text="Merch" section="merch" />
             <MenuItem icon={MessageSquare} text="Reviews" section="reviews" />
+            <MenuItem icon={Heart} text="DJ Smooch.exe" section="gofundme" />
 
             {/* ARCADE BUTTON DESKTOP */}
             <button
@@ -2571,25 +2832,25 @@ const submitReview = async (e) => {
             {/* User-check */}
             {currentUser ? (
               <button onClick={handleLogout}
-              className="group relative px-6 py-3 bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-red-400/50 rounded-lg backdrop-blur-sm hover:border-red-300 transition-all">
+                className="group relative px-6 py-3 bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-red-400/50 rounded-lg backdrop-blur-sm hover:border-red-300 transition-all">
                 <div className="flex items-center gap-3">
-                <LogOut className="w-5 h-5 text-red-400" />
-                <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
+                  <LogOut className="w-5 h-5 text-red-400" />
+                  <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
                 </div>
-            </button>
-              ) : (
-              <button onClick={() => setShowLogin(true)}
-               className="group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-400/50   rounded-lg backdrop-blur-sm hover:border-green-300 transition-all">
-                <div className="flex items-center gap-3">
-                 <Users className="w-5 h-5 text-green-400" />
-                 <span className="text-green-100 font-semibold">Login</span>
-                 </div>
               </button>
-                )}
-                
+            ) : (
+              <button onClick={() => setShowLogin(true)}
+                className="group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2 border-green-400/50   rounded-lg backdrop-blur-sm hover:border-green-300 transition-all">
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-green-400" />
+                  <span className="text-green-100 font-semibold">Login</span>
+                </div>
+              </button>
+            )}
+
           </div>
 
-            {/* Mobile options */}    
+          {/* Mobile options */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="lg:hidden p-2 text-cyan-400 hover:text-cyan-300"
@@ -2609,6 +2870,7 @@ const submitReview = async (e) => {
             <MenuItem icon={Church} text="The Church" section="church" />
             <MenuItem icon={ShoppingBag} text="Merch" section="merch" />
             <MenuItem icon={MessageSquare} text="Reviews" section="reviews" />
+            <MenuItem icon={Heart} text="DJ Smooch.exe" section="gofundme" />
 
             {/* ARCADE BUTTON MOBILE */}
             <button
@@ -2670,25 +2932,25 @@ const submitReview = async (e) => {
                 </span>
               </div>
             </button>
-           {/* User-check */}
+            {/* User-check */}
 
             {currentUser ? (
               <button onClick={handleLogout} className="w-full group relative px-6 py-3 bg-gradient-to-r from-red-900/30 to-orange-900/30 border-2 border-red-400/50 rounded-lg">
                 <div className="flex items-center gap-3">
-                <LogOut className="w-5 h-5 text-red-400" />
-                <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
+                  <LogOut className="w-5 h-5 text-red-400" />
+                  <span className="text-red-100 font-semibold">Logout ({currentUser.username})</span>
                 </div>
               </button>
-               ) : (
-             <button onClick={() => { setShowLogin(true); setMobileMenuOpen(false); }} 
-               className="w-full group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2        border-green-400/50 rounded-lg">
-                 <div className="flex items-center gap-3">
-                 <Users className="w-5 h-5 text-green-400" />
-                 <span className="text-green-100 font-semibold">Login</span>
-                 </div>
-                 </button>
-                  )}
-       
+            ) : (
+              <button onClick={() => { setShowLogin(true); setMobileMenuOpen(false); }}
+                className="w-full group relative px-6 py-3 bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-2        border-green-400/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-green-400" />
+                  <span className="text-green-100 font-semibold">Login</span>
+                </div>
+              </button>
+            )}
+
           </div>
         )}
       </nav>
@@ -3644,19 +3906,19 @@ const submitReview = async (e) => {
             </p>
 
 
-          {reviews.length > 0 && (
-            <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-br from-purple-900/60 to-pink-900/60 rounded-xl border-2 border-purple-400/50 backdrop-blur-sm">
-            <span className="text-3xl font-bold text-white">
-            {averageRating.toFixed(1)}
-            </span>
-            <div className="flex gap-1">{renderStars(averageRating)}</div>
-            <span className="text-purple-200">
-            ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
-          </span>
-        </div>
-      )}
-      </div>
-    
+            {reviews.length > 0 && (
+              <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-br from-purple-900/60 to-pink-900/60 rounded-xl border-2 border-purple-400/50 backdrop-blur-sm">
+                <span className="text-3xl font-bold text-white">
+                  {averageRating.toFixed(1)}
+                </span>
+                <div className="flex gap-1">{renderStars(averageRating)}</div>
+                <span className="text-purple-200">
+                  ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-6">
             {reviews.map((review) => (
               <div
@@ -3676,11 +3938,10 @@ const submitReview = async (e) => {
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-6 h-6 ${
-                          i < review.rating
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-gray-600'
-                        }`}
+                        className={`w-6 h-6 ${i < review.rating
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-gray-600'
+                          }`}
                       />
                     ))}
                   </div>
@@ -3724,11 +3985,10 @@ const submitReview = async (e) => {
                       className="transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`w-10 h-10 ${
-                          rating <= newReview.rating
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-gray-600'
-                        }`}
+                        className={`w-10 h-10 ${rating <= newReview.rating
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-gray-600'
+                          }`}
                       />
                     </button>
                   ))}
@@ -3755,6 +4015,264 @@ const submitReview = async (e) => {
                 Submit Review
               </button>
             </form>
+          </div>
+        </div>
+      </section>
+
+      {/* DJ Smooch.exe GoFundMe Memorial Section */}
+      <section id="gofundme" className="relative py-20 px-4">
+        <div className="max-w-6xl mx-auto space-y-12">
+          <div className="text-center space-y-4">
+            <Heart className="w-20 h-20 text-rose-400 mx-auto mb-4 animate-pulse" />
+            <h2 className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+              IN MEMORY OF DJ SMOOCH.EXE
+            </h2>
+            <p className="text-xl text-rose-200 italic">
+              Gone too soon, but his beats echo through eternity
+            </p>
+
+            {/* Donation Progress */}
+            <div className="mt-8 p-6 bg-gradient-to-br from-rose-900/60 to-pink-900/60 rounded-xl border-2 border-rose-400/50 backdrop-blur-sm max-w-md mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-rose-300 font-bold">Cosmic Credits Raised</span>
+                <span className="text-2xl font-black text-white">
+                  {donationTotal.toLocaleString()} / 2,000 ◈
+                </span>
+              </div>
+              <div className="w-full bg-black/40 rounded-full h-4 border border-rose-400/30">
+                <div
+                  className="bg-gradient-to-r from-rose-500 to-pink-500 h-full rounded-full transition-all duration-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]"
+                  style={{ width: `${Math.min((donationTotal / 2000) * 100, 100)}%` }}
+                />
+              </div>
+              <p className="text-sm text-rose-300 mt-2">
+                {donationTotal >= 2000 ? '🎉 Goal Reached! DJ Smooch.exe smiles from the cosmic beyond!' : `${(2000 - donationTotal).toLocaleString()} ◈ to go!`}
+              </p>
+            </div>
+          </div>
+
+          {/* The Story */}
+          <div className="relative p-8 bg-gradient-to-br from-rose-900/40 to-pink-900/40 rounded-3xl border-2 border-rose-400/50 backdrop-blur-lg shadow-[0_0_60px_rgba(244,63,94,0.3)]">
+            <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 rounded-3xl opacity-20 blur-2xl animate-pulse" />
+            <div className="relative space-y-8">
+              <h3 className="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+                🎧 THE LEGEND OF DJ SMOOCH.EXE 🎧
+              </h3>
+
+              <div className="space-y-6 text-lg text-rose-50 leading-relaxed">
+                <p>
+                  <strong className="text-rose-300">DJ Smooch.exe</strong> wasn't just a DJ — he was a
+                  <em className="text-pink-300"> cosmic phenomenon</em>. His wireless setup was so legendary
+                  that <strong className="text-cyan-300">Bob</strong> once tried to photobomb his pictures,
+                  and honestly? Those photos became collectible NFTs worth more than some star systems.
+                </p>
+
+                <p>
+                  When Johnny Mythrilhand announced a planet-wide concert on Niniche, the crowd didn't come
+                  for Johnny alone (sorry, Johnny). They came because <strong className="text-rose-300">DJ Smooch.exe</strong>
+                  was spinning. The Kuatoa people? <em>"We are actually huge fans of yours!"</em> they said —
+                  not to Wraith, not to Johnny, but to the legend himself. Even the fish-people knew quality
+                  beats when they heard them.
+                </p>
+
+                <div className="p-4 bg-black/30 rounded-xl border border-rose-400/40">
+                  <p className="text-rose-200 italic text-center">
+                    "We are more fans of DJ Smooch.exe" — The Kuatoa, literally preferring him over Johnny Mythrilhand.
+                    <span className="text-pink-400 font-bold"> This is not a drill.</span>
+                  </p>
+                </div>
+
+                <p>
+                  That fateful day on Niniche, while <strong className="text-purple-300">Tabaga</strong> was
+                  body-slamming wrestlers in perfect synchrony with the music, while the mosh pit raged,
+                  while medical tents overflowed with overly-enthusiastic fans who had discovered that
+                  headbanging has consequences... <strong className="text-rose-300">DJ Smooch.exe</strong> kept
+                  the beat going. <em>The show must go on.</em>
+                </p>
+
+                <p className="text-xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+                  And then... backstage happened. 💔
+                </p>
+
+                <p>
+                  Nobody saw Bob coming. <em>Nobody ever does.</em> One moment DJ Smooch.exe was there,
+                  mid-sentence, probably about to drop the sickest beat the universe had ever heard.
+                  The next moment — <strong className="text-red-400">stabbed</strong>. Right there.
+                  <span className="text-rose-300">Chimer caught him as he fell.</span> Johnny tried slapping
+                  him back to consciousness because <em>of course</em> Johnny thought rock-and-roll
+                  could cure fatal wounds.
+                </p>
+
+                <div className="p-4 bg-black/30 rounded-xl border border-red-400/40">
+                  <p className="text-red-200 italic text-center">
+                    "They watched the light leave his eyes. He died mid-sentence.
+                    We'll never know what he was about to say.
+                    Probably something about bass drops." 😭
+                  </p>
+                </div>
+
+                <p>
+                  The cruel irony? <strong className="text-emerald-300">Bob</strong>, our lovable blob friend,
+                  the one who brings snacks on missions and asks about your day... did this.
+                  The scars on Chimer from a previous Bob encounter? <em>Identical.</em>
+                  Bob's moral compass is, shall we say, <strong className="text-green-400">delightfully flexible</strong>.
+                </p>
+
+                <p className="text-rose-200">
+                  Was there a bounty on DJ Smooch.exe's head? The retired wrestlers mentioned bounties.
+                  Was this a targeted hit? An accident? Did Bob just <em>really</em> hate EDM?
+                  We may never know. What we DO know is that the universe lost a legend that day.
+                </p>
+
+                <div className="p-6 bg-gradient-to-br from-black/50 to-rose-900/30 rounded-xl border-2 border-rose-400/50">
+                  <h4 className="text-2xl font-bold text-rose-300 mb-4 text-center">🌟 What DJ Smooch.exe Meant To Us 🌟</h4>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <Music className="w-6 h-6 text-rose-400 flex-shrink-0 mt-1" />
+                      <span>His beats were so fire that <strong className="text-rose-300">Kuatoa fish-people partied to his livestream</strong> while sailing to kidnap people. Music truly connects all beings.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Star className="w-6 h-6 text-pink-400 flex-shrink-0 mt-1" />
+                      <span>He had <strong className="text-pink-300">fangirls taking pictures of him</strong> before he died. Truly living the dream until the very (sudden) end.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Sparkles className="w-6 h-6 text-purple-400 flex-shrink-0 mt-1" />
+                      <span>His wireless setup was <strong className="text-purple-300">"really cool"</strong> — Bob's own words before, you know, the stabbing.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Zap className="w-6 h-6 text-cyan-400 flex-shrink-0 mt-1" />
+                      <span>He was killed <strong className="text-cyan-300">mid-collaboration with Johnny Mythrilhand</strong>. Their dual performance was so legendary that security couldn't handle the crowd.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <p className="text-center text-xl font-semibold">
+                  <span className="text-rose-300">DJ Smooch.exe</span> didn't die doing what he loved.
+                  He died getting <span className="text-red-400">stabbed backstage</span> by a friendly blob.
+                  <br />But hey, at least he was at a concert? <em className="text-pink-400">Silver linings.</em>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Donation Form */}
+          <div className="relative p-8 bg-gradient-to-br from-indigo-900/40 to-rose-900/40 rounded-2xl border-2 border-rose-400/50 backdrop-blur-lg shadow-[0_0_40px_rgba(244,63,94,0.3)]">
+            <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300 mb-6 text-center">
+              💝 Contribute to His Memory 💝
+            </h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newDonation.name || newDonation.amount <= 0) return;
+                // Open checkout instead of directly saving
+                setShowDonationCheckout(true);
+              }}
+              className="space-y-6"
+            >
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-rose-300 font-semibold mb-2">
+                    Your Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newDonation.name}
+                    onChange={(e) =>
+                      setNewDonation({ ...newDonation, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors"
+                    placeholder="Enter your cosmic name..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-rose-300 font-semibold mb-2">
+                    Donation Amount (◈)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newDonation.amount}
+                    onChange={(e) =>
+                      setNewDonation({ ...newDonation, amount: parseInt(e.target.value) || 0 })
+                    }
+                    className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors"
+                    placeholder="100"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-rose-300 font-semibold mb-2">
+                  Message for DJ Smooch.exe (Optional)
+                </label>
+                <textarea
+                  value={newDonation.message}
+                  onChange={(e) =>
+                    setNewDonation({ ...newDonation, message: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-black/40 border-2 border-rose-400/40 rounded-lg text-rose-100 placeholder-rose-400/50 focus:border-rose-400 focus:outline-none transition-colors h-24 resize-none"
+                  placeholder="Share a memory, or just say 'Drop the bass one more time, king' 🎧"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-4 px-6 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold text-lg rounded-lg transition-all duration-300 shadow-[0_0_30px_rgba(244,63,94,0.4)] hover:shadow-[0_0_40px_rgba(244,63,94,0.6)] transform hover:scale-105 flex items-center justify-center gap-3"
+              >
+                <Heart className="w-6 h-6" />
+                Proceed to Payment
+                <Heart className="w-6 h-6" />
+              </button>
+            </form>
+          </div>
+
+          {/* Recent Donations */}
+          {donations.length > 0 && (
+            <div className="space-y-6">
+              <h3 className="text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-300">
+                💫 Cosmic Contributors 💫
+              </h3>
+              <div className="space-y-4">
+                {donations.slice().reverse().map((donation) => (
+                  <div
+                    key={donation.id}
+                    className="p-6 bg-gradient-to-br from-rose-900/40 to-pink-900/40 rounded-xl border-2 border-rose-400/30 backdrop-blur-sm hover:border-rose-300 hover:shadow-[0_0_35px_rgba(244,63,94,0.5)] transition-all duration-300"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="text-2xl font-bold text-rose-300">
+                          {donation.name}
+                        </h4>
+                        <p className="text-sm text-rose-400 italic">
+                          {donation.date}
+                        </p>
+                      </div>
+                      <div className="text-2xl font-black text-rose-200">
+                        {donation.amount.toLocaleString()} ◈
+                      </div>
+                    </div>
+                    {donation.message && (
+                      <p className="text-rose-100 text-lg leading-relaxed italic">
+                        "{donation.message}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Memorial Quote */}
+          <div className="text-center p-8 bg-gradient-to-br from-black/50 to-rose-900/30 rounded-2xl border-2 border-rose-400/30">
+            <p className="text-2xl font-bold text-rose-300 italic">
+              "The beat drops, but legends never do." 🎧💔
+            </p>
+            <p className="text-rose-400 mt-4">
+              — The Cosmic Syndicate, still wondering what DJ Smooch.exe was about to say
+            </p>
+            <p className="text-sm text-rose-500 mt-4">
+              (Bob has been asked to "maybe not stab our collaborators next time." He said he'd "think about it." 🙃)
+            </p>
           </div>
         </div>
       </section>
